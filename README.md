@@ -579,6 +579,8 @@ QnapNasHarmony/
 
 ### 本机真实构建命令（已验证）
 
+> **预编译库还原（必做）**：Tailscale Go 引擎在仓库中以 xz 压缩形式存放——`entry/libs/arm64-v8a/libtailscale_go.so.xz`（原始约 24 MB）。首次构建前先执行 `python tools/unpack_libs.py` 还原为同名 `.so`，脚本幂等，已还原则直接跳过。
+
 ```powershell
 $env:DEVECO_SDK_HOME = "C:\Program Files\Huawei\DevEco Studio\sdk"
 $env:NODE_HOME      = "C:\Program Files\Huawei\DevEco Studio\tools\node"
