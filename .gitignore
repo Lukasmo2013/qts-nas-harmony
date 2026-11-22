@@ -8,8 +8,10 @@
 /entry/.preview/
 /.idea/
 *.log
-*.hap
+*.signed.hap
 *.app
+# unsigned版本可以上传，但需要手动控制
+# *.hap
 
 # ===== 签名材料与任何凭据（严禁入库） =====
 /tools/signing/
