@@ -44,7 +44,7 @@
 - 仿真用例同步新流程（failed → 下一步放行、pick 阶段轮询补候选），全部通过。
 - `validate_project.py` PASS（ZH=EN=629，新增 `login.ts.nextIp.hint`）；release 编译 BUILD SUCCESSFUL。
 - 分发包：`dist/QnapNasManager-2.1.6-unsigned.hap`，SHA-256
-  `24556ec92fe2c556056eecb34e5cd679da1320a675dc8a2360cfd84bbb73f830`。
+  `0ac13c9127234a769b42f10a048bba671a50ab41128844f5e0541ef85adcc12b`。
 
 ---
 

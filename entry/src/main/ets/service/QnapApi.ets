@@ -1799,28 +1799,47 @@ export class QnapApi {
 
   /**
    * 枚举主机上的**全部**共享目录。
-   * 按「File Station 目录树 → File Station 5 → 共享管理接口」的顺序尝试，
-   * 谁先返回可用结果就用谁；全部失败时返回空数组（调用方仍保留 privRequest 的结果）。
+   *
+   * 候选接口并行发起（互不阻塞，最坏 6 秒；串行会拖到几十秒），
+   * 结果做并集 —— 某些固件的 `get_tree` 只返回部分节点，合并才完整。
+   * 全部失败时返回空数组，调用方仍保留 privRequest 的结果。
    */
   private static async enumerateShares(): Promise<string[]> {
     const paths: string[] = [
       '/FileStation6/utilRequest.cgi?func=get_tree&node=/&is_iso=0&media=2',
+      '/FileStation6/utilRequest.cgi?func=get_tree&node=share&is_iso=0',
       '/cgi-bin/filemanager/utilRequest.cgi?func=get_tree&node=/&is_iso=0',
       '/cgi-bin/management/manaRequest.cgi?subfunc=get_share_list',
       '/cgi-bin/management/manaRequest.cgi?subfunc=get_share&read=1'
     ];
+    const tasks: Promise<string>[] = [];
     for (const path of paths) {
-      const body = await QnapApi.get(QnapApi.baseUrl() + path, true, 8000);
+      tasks.push(QnapApi.tryBody(path));
+    }
+    const bodies: string[] = await Promise.all(tasks);
+    const names: string[] = [];
+    for (const body of bodies) {
       if (body.length === 0) {
         continue;
       }
-      const names: string[] = QnapApi.shareNamesFrom(body);
-      if (names.length > 0) {
-        // 上限保护：异常响应（例如被弹回门户 HTML）不应引发成百上千次探测。
-        return names.length > 32 ? names.slice(0, 32) : names;
+      for (const name of QnapApi.shareNamesFrom(body)) {
+        if (names.indexOf(name) < 0) {
+          names.push(name);
+        }
       }
     }
-    return [];
+    // 上限保护：异常响应不应引发成百上千次存在性探测。
+    return names.length > 32 ? names.slice(0, 32) : names;
+  }
+
+  /** 探测型请求：失败一律返回空串，绝不让单个接口的异常打断整体枚举。 */
+  private static async tryBody(path: string): Promise<string> {
+    try {
+      // 关掉自动重登：并发探测时多次 relogin 会互相顶掉会话。
+      return await QnapApi.get(QnapApi.baseUrl() + path, false, 6000);
+    } catch (e) {
+      return '';
+    }
   }
 
   /** 从 JSON / XML 响应里提取共享名（两种格式都做，避免依赖单一固件格式）。 */
