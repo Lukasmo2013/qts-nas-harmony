@@ -658,8 +658,11 @@ export struct LoginPage {
       this.tsEngineErr = t('login.ts.engineDead', this.lang);
       // 扩展已死时不能再写「正在等待授权完成、登录后会自动识别」——那是等不到的空承诺。
       this.tsStage = this.tsAuthUrlReal ? 'login.ts.auth.wait' : 'login.ts.auth.dead';
-      // 自动重连（15 秒最多一次，避免和系统抢占）
-      if (Date.now() - this.tsRestartAt > 15000) {
+      // 自动重连（15 秒最多一次，避免与系统抢占）。
+      // 只在 Tailscale 登录页重连：用户已经在「选地址」时重启扩展会把隧道拆掉，
+      // 刚拿到的节点列表瞬间清空，表现得就是「一直找不到 NAS 地址」。
+      // 该页要恢复轮询，退回登录页即可。
+      if (this.tsPhase === 'auth' && Date.now() - this.tsRestartAt > 15000) {
         this.tsRestartAt = Date.now();
         this.tsRestartEngine();
       }
@@ -850,16 +853,25 @@ export struct LoginPage {
   /**
    * 授权完成后的自动前进：延时 900ms 让「已连接」状态先闪一下，
    * 避免用户在完全没看到反馈的情况下被瞬间切页。
+   *
+   * 只有**已经拿到节点列表**才自动进入选地址。否则会把人直接丢进一个空列表，
+   * 看起来就是「卡在找 NAS 地址」，而该页此前没有任何提示。
+   * 没拿到就留在当前页继续轮询，主按钮仍可手动前进。
    */
-  private tsAutoNext(): void {    if (this.tsAutoNextPending) {
+  private tsAutoNext(): void {
+    if (this.tsAutoNextPending) {
       return;
     }
     this.tsAutoNextPending = true;
     setTimeout(() => {
       this.tsAutoNextPending = false;
-      if (this.tsPhase === 'auth' && this.tsAuthed) {
-        this.tsAuthNext();
+      if (this.tsPhase !== 'auth' || !this.tsAuthed) {
+        return;
       }
+      if (this.tsCandidates.length === 0 && this.tsPeers.length === 0) {
+        return;
+      }
+      this.tsAuthNext();
     }, 900);
   }
 
@@ -1896,6 +1908,40 @@ export struct LoginPage {
               .fontColor(Theme.DANGER)
               .width('100%')
               .margin({ top: 6 })
+          }
+
+          // 列表为空时不能只是"什么都没有"：用户会以为卡在寻找地址。
+          // 明确说明原因，并给一个「重新检测节点」的动作。
+          if (this.tsCandidates.length === 0 && this.tsPeers.length === 0) {
+            Column() {
+              Text(t('login.ts.pick.empty', this.lang))
+                .fontSize(12)
+                .lineHeight(18)
+                .fontColor(Theme.textPrimary(this.theme))
+                .width('100%')
+              Text(t('login.ts.pick.empty.hint', this.lang))
+                .fontSize(11)
+                .lineHeight(16)
+                .fontColor(Theme.textSecondary(this.theme))
+                .width('100%')
+                .margin({ top: 6 })
+              Button(t('login.ts.pick.retry', this.lang), { type: ButtonType.Normal })
+                .height(34)
+                .fontSize(12)
+                .fontColor(Theme.PRIMARY)
+                .backgroundColor(Theme.primarySoft(this.theme))
+                .borderRadius(9)
+                .margin({ top: 10 })
+                .onClick(() => {
+                  this.tsRecheck();
+                })
+            }
+            .width('100%')
+            .padding(12)
+            .borderRadius(12)
+            .backgroundColor(Theme.subCardBg(this.theme))
+            .margin({ top: 10 })
+            .alignItems(HorizontalAlign.Start)
           }
 
           // NAS 精确匹配候选优先

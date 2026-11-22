@@ -39,6 +39,7 @@ class Page:
         self.timer = None
         self.ctx = object()
         self.tsRestart = False
+        self.auto_next = False
 
     # ---------- tailscaleLogin() ----------
     def tailscale_login(self, start_ok=True):
@@ -79,8 +80,9 @@ class Page:
         if age > 8000:
             self.tsAuthed = False
             self.tsEngineErr = DEAD_MSG
-            self.tsStage = 'login.ts.auth.wait'
-            self.tsRestart = True
+            self.tsStage = 'login.ts.auth.wait' if self.tsAuthUrlReal else 'login.ts.auth.dead'
+            # 只在登录页重连：选地址阶段重启扩展会拆掉隧道
+            self.tsRestart = (self.tsPhase == AUTH)
             return
         state = st.get('state', 'starting')
         if state in ('failed', 'timeout', 'stopped'):
@@ -98,7 +100,8 @@ class Page:
             if self.tsPhase == PICK:
                 return
             self.tsStage = 'login.ts.auth.ok'
-            self.auto_next = True
+            # 节点列表为空时自动前进会把人丢进空列表（表现为卡在找 NAS 地址）
+            self.auto_next = bool(self.tsCandidates or self.tsPeers)
             return
         if state == 'needs_login':
             if st.get('authUrl') and not self.tsAuthUrlReal:
@@ -238,6 +241,34 @@ def run():
     good = p.tsPhase == PICK and p.tsAuthed is True and len(p.tsCandidates) == 1
     ok = ok and good
     print(f'  [{"OK" if good else "FAIL"}] pick 阶段轮询 -> 自动补齐候选 {len(p.tsCandidates)} 个')
+
+    # E: running 但节点还没同步 -> 不自动前进（否则进入空列表）
+    p = Page()
+    p.tailscale_login(True)
+    p.tick({'state': 'running', 'authUrl': '', 'candidates': []})
+    good = (p.auto_next is False) and p.tsPhase == AUTH
+    ok = ok and good
+    print(f'  [{"OK" if good else "FAIL"}] running 但无节点 -> 不自动前进，留在登录页')
+
+    # F: running 且有节点 -> 自动前进
+    p = Page()
+    p.tailscale_login(True)
+    p.tick({'state': 'running', 'authUrl': '',
+            'candidates': [{'name': 'nas', 'address': '100.64.0.5'}]})
+    good = p.auto_next is True and p.tsPhase == AUTH
+    ok = ok and good
+    print(f'  [{"OK" if good else "FAIL"}] running 且有节点 -> 自动前进')
+
+    # G: 选地址阶段心跳超时 -> 不重启扩展（避免拆掉正在用的隧道）
+    p = Page()
+    p.tailscale_login(True)
+    p.tick({'state': 'running', 'authUrl': '',
+            'candidates': [{'name': 'nas', 'address': '100.64.0.5'}]})
+    p.auth_next()
+    p.tick({'state': 'needs_login', 'age': 12000})
+    good = p.tsPhase == PICK and p.tsRestart is False
+    ok = ok and good
+    print(f'  [{"OK" if good else "FAIL"}] pick 阶段心跳超时 -> 不重启扩展，保留隧道')
 
     # VPN 授权被拒：不进登录页，直接失败（合理）
     p = Page()
