@@ -4,6 +4,8 @@
 
 **作者 / 版权**：莫洁安（annst） · **许可**：MIT · **当前版本**：2.1.4
 
+**仓库地址**：https://gitee.com/YOUR_GITEE_ACCOUNT/qts-nas-harmony
+
 > 应用显示名统一为 **QTS NAS**（系统级应用名走 `app_name` 资源，应用内标题走 `app.name` 文案键）。
 > 包名 `com.wlt.qnap.nasmanager`。
 > **配色基调：素雅中性灰 + 克制钢蓝，界面零暖黄。**
