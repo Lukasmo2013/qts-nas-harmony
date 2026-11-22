@@ -2,7 +2,7 @@
 
 用鸿蒙手机 / 平板管理你的威联通（QNAP）NAS：设备状态、文件、容器、自动备份，以及**开箱可用的 Tailscale 内网直连**。
 
-**作者 / 版权**：莫洁安（annst） · **许可**：MIT · **当前版本**：2.1.6
+**作者 / 版权**：莫洁安（annst） · **许可**：MIT · **当前版本**：2.1.7
 
 **仓库地址**：https://gitee.com/YOUR_GITEE_ACCOUNT/qts-nas-harmony
 **更新日志**：[CHANGELOG.md](./CHANGELOG.md)（2.1.5 起独立维护，含修复根因说明）
@@ -91,7 +91,7 @@ bash tools/push_gitee.sh qts-nas-harmony
 #    按提示输入 Gitee 用户名；密码 / 私人令牌由 git 自行提示
 ```
 
-Release 附件只上传 **unsigned HAP**：`dist/QnapNasManager-2.1.6-unsigned.hap`。
+Release 附件只上传 **unsigned HAP**：`dist/QnapNasManager-2.1.7-unsigned.hap`。
 **不要上传** `tools/signing/` 下的证书、keystore、profile 或任何 signed 产物。
 
 ---
@@ -426,7 +426,7 @@ peers: myiddrive → 100.x.x.x ; myidnas → 100.x.x.x ; …
 最终包：`dist/QnapNasManager-2.1.5-unsigned.hap`（unsigned），SHA-256
 `0e6aceb53c6687b2d80227925ec8443d2023235e0d88627a250465797400854d`。
 
-**后续版本号**：当前基线为 2.1.6，下一次从 2.1.7 递增，不再回到 1.2.x 序列。
+**后续版本号**：当前基线为 2.1.7，下一次从 2.1.8 递增，不再回到 1.2.x 序列。
 
 **真机诊断：直接读状态文件（最快，无需日志）**：
 
@@ -631,10 +631,14 @@ python tools/sign_release.py --verify-only  # 只复核现有 profile 与 signed
 - **页面柔和渐变底**：外壳与页面铺 `linearGradient`（`Theme.pageGradientColors` 返回 `[颜色, 位置]` 元组数组），玻璃框模糊其后方，形成通透大气观感。
 - **所有页面左右滑动**：四个业务页（设备主页 / 文件 / 容器 / 我的）统一放入 `Swiper`；`goTo()` 与侧栏 / 底部导航双向同步，`onChange` 回写当前页；`loop` 关闭、指示器隐藏，滑动与点按等效。
 - **三段式外壳**：`AdaptiveShell` 在 md / lg 下呈现「分组持久侧边栏（概览 / 管理 / 系统）+ 顶部应用栏 + 居中限宽内容区」；sm 为悬浮底栏 + 单列。
-- **手机底栏 = 悬浮雾玻璃圆角长条**：不再是贴底通栏，而是一条浮在内容之上的胶囊长条 ——
-  `height 62vp` / `borderRadius 26vp` / 半透明底（浅色 `#FFFFFFD6`、深色 `#1E222AC4`）/ `backgroundBlurStyle(BlurStyle.Regular)` / 1vp 淡描边（`#DFE3E9` / `#343A44`）/ `shadow(radius 26, offsetY 8)`；
-  当前项套一层 `barActiveBg` 胶囊（浅色 `#EAF0F8` / 深色 `#26344D`），内容区预留 `BAR_HEIGHT + 22` 的底部内边距，滚动时内容从长条下方穿过，形成真实的悬浮层次。
-  侧边栏与顶栏同步改为 `chromeBg`（`#FBFBFCD2` / `#171A1FC2`）+ 系统模糊 + 单边描边，全局只有一套雾玻璃语言。
+- **「框」只有一套规格（2.1.7 起）**：新增 `surface*` 表面令牌 —— 卡片、手机底栏、顶栏、侧栏、各页弹层、
+  自动备份配置层、共享诊断层**全部**取同一组值：纯白 `#FFFFFF` + 1px 冷灰描边 `#E6E8EC` +
+  投影 `rgba(20,32,58,0.10)`。悬浮底栏只是把投影半径放大（r22/y8）来区分「浮起来」，
+  底色 / 描边与卡片完全相同，不会再出现「同一个框两种白、两种描边」。
+- **手机底栏**：`height 62vp` / `borderRadius 26vp` / `surfaceBg` 纯白 / 1vp `surfaceBorder` / `floatingShadow`；
+  当前项套 `primarySoft` 胶囊 —— 与侧栏选中态**同一个令牌**，同一件事在两处看起来完全一样。
+  内容区预留 `BAR_HEIGHT + 22` 底部内边距，滚动时内容从长条下方穿过，形成真实的悬浮层次。
+  侧栏与顶栏同样 `surfaceBg` + 单边 `surfaceBorder`。
 - **页面自身持有滚动**：`pagedContent()` 的 Swiper 子项**不再包 `Scroll()`**（此前 `Scroll(){ HomePage() }` 让页面 `height('100%')` 失去确定值，直接导致整页空白）；滚动下沉到各页自己的 `Scroll().layoutWeight(1)`，`PageHeader` 固定不动。
 
 - **中性色板（默认，零暖黄、零蓝调）**：基底 `#F7F8FA → #EDEFF2` 中性灰阶 + 纯白卡片 `#FFFFFF` + 1px 极淡描边 `#E8EAED`；
@@ -749,10 +753,10 @@ python tools/sign_release.py --verify-only  # 只复核现有 profile 与 signed
 | # | 项目 | 状态 | 说明 |
 | --- | --- | --- | --- |
 | 1 | Stage 模型 / ArkTS 静态类型 / 无 `any` / 无非空断言 | ✅ | 真实编译 + 静态校验 PASS |
-| 2 | `bundleName`、版本号、图标、应用名资源 | ✅ | `com.wlt.qnap.nasmanager` / `2.1.6` / `QTS NAS` / 48 图标 |
+| 2 | `bundleName`、版本号、图标、应用名资源 | ✅ | `com.wlt.qnap.nasmanager` / `2.1.7` / `QTS NAS` / 48 图标 |
 | 3 | 设备类型 `phone / tablet / 2in1`、多断点适配 | ✅ | 宽度驱动 sm / md / lg |
 | 4 | 权限最小化与申请原因 | ✅ | `INTERNET`、`GET_NETWORK_INFO`、`READ_IMAGEVIDEO` 三项 + `$string` 用途说明；未使用的 `KEEP_BACKGROUND_RUNNING` 已删除 |
-| 5 | 中英双语、深浅色 | ✅ | 629×2 文案键 |
+| 5 | 中英双语、深浅色 | ✅ | 633×2 文案键 |
 | 6 | release 构建 + 代码压缩 | ✅ | signed HAP |
 | 7 | `app_gallery` 类型 release profile | ✅ | `verify-profile` PASS |
 | 8 | HAP 签名 + 验签 | 本地自备 | 仓库只分发 unsigned；签名需自有 AGC 证书与 `QNAP_SIGN_PASSWORD` |

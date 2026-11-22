@@ -49,6 +49,42 @@ export class Theme {
     return Theme.effective(setting) === 'dark';
   }
 
+  /* ---------- 统一的「表面」令牌（卡片 / 底栏 / 顶栏 / 侧栏 / 弹层共用） ----------
+   * 全 app 只有一套框：同底色、同描边、同投影色。
+   * 任何新增容器都必须从这里取色，避免出现「同一个框两种白、两种描边」。
+   * 浅色一律纯白实底：半透明会采样壁纸，暖色壁纸会把卡片染黄。 */
+  static surfaceBg(setting: string): string {
+    return Theme.isDark(setting) ? '#171A20' : '#FFFFFF';
+  }
+
+  static surfaceBorder(setting: string): string {
+    return Theme.isDark(setting) ? '#2A2F37' : '#E6E8EC';
+  }
+
+  static surfaceShadowColor(setting: string): string {
+    return Theme.isDark(setting) ? 'rgba(0,0,0,0.40)' : 'rgba(20,32,58,0.10)';
+  }
+
+  /** 卡片 / 弹层投影：r16 / y5。 */
+  static surfaceShadow(setting: string): ShadowOptions {
+    return {
+      radius: 16,
+      color: Theme.surfaceShadowColor(setting),
+      offsetX: 0,
+      offsetY: 5
+    };
+  }
+
+  /** 悬浮件（底栏）投影：同色同描边，仅半径更大以形成「漂浮」层次。 */
+  static floatingShadow(setting: string): ShadowOptions {
+    return {
+      radius: 22,
+      color: Theme.surfaceShadowColor(setting),
+      offsetX: 0,
+      offsetY: 8
+    };
+  }
+
   /* ---------- 基底 ---------- */
 
   /** 页面底色：冷调浅灰蓝，衬出悬浮的玻璃卡片。 */
@@ -57,7 +93,7 @@ export class Theme {
   }
 
   static cardBg(setting: string): string {
-    return Theme.isDark(setting) ? '#171A20' : '#FFFFFF';
+    return Theme.surfaceBg(setting);
   }
 
   /** 次级容器：输入框、内嵌块、选中行。 */
@@ -201,13 +237,12 @@ export class Theme {
    * 底色半透明（明 0.80 / 暗 0.80），叠系统组分模糊；
    * 描边为一圈极淡冷灰，把卡片框成一片「玻璃」而不是一整块白。 */
   static glassBg(setting: string): string {
-    // 浅色模式用**纯白不透明**：半透明层会采样窗口背后的壁纸 / 主题色，
-    // 暖色壁纸会把整块卡片染成浅黄（2.1.5 的真机反馈），纯白是唯一稳妥解。
-    return Theme.isDark(setting) ? '#191D24CC' : '#FFFFFF';
+    // 浅色与卡片完全同一底色；深色保留一点透明度，避免整屏纯黑死板。
+    return Theme.isDark(setting) ? '#171A20F2' : Theme.surfaceBg(setting);
   }
 
   static glassBorder(setting: string): string {
-    return Theme.isDark(setting) ? '#2F3541' : '#E6E8EC';
+    return Theme.surfaceBorder(setting);
   }
 
   /** 玻璃片顶缘高光：叠在 1px 描边上，模拟光线掠过玻璃边缘。 */
@@ -216,17 +251,12 @@ export class Theme {
   }
 
   static glassShadow(setting: string): string {
-    return Theme.isDark(setting) ? 'rgba(0,0,0,0.36)' : 'rgba(20,32,58,0.10)';
+    return Theme.surfaceShadowColor(setting);
   }
 
   /** 卡片投影：玻璃片用大半径浅投影制造「漂浮」感。 */
   static cardShadow(setting: string): ShadowOptions {
-    return {
-      radius: Theme.isDark(setting) ? 18 : 16,
-      color: Theme.glassShadow(setting),
-      offsetX: 0,
-      offsetY: Theme.isDark(setting) ? 6 : 5
-    };
+    return Theme.surfaceShadow(setting);
   }
 
   /**
@@ -261,26 +291,27 @@ export class Theme {
   static readonly BAR_RADIUS: number = 26;
 
   static barBg(setting: string): string {
-    return Theme.isDark(setting) ? '#1B1F27D9' : '#FFFFFFF5';
+    return Theme.surfaceBg(setting);
   }
 
   static barBorder(setting: string): string {
-    return Theme.isDark(setting) ? '#333A45' : '#E1E7F0';
+    return Theme.surfaceBorder(setting);
   }
 
   /** 底栏投影比卡片更明显，才能形成「悬浮」的层次。 */
   static barShadow(setting: string): string {
-    return Theme.isDark(setting) ? 'rgba(0,0,0,0.52)' : 'rgba(20,32,58,0.16)';
+    return Theme.surfaceShadowColor(setting);
   }
 
   /** 底栏选中项的高亮胶囊底色。 */
   static barActiveBg(setting: string): string {
-    return Theme.isDark(setting) ? '#22304A' : '#E7EFFC';
+    // 与侧栏选中态同一令牌，保证「选中」在底栏与侧栏看起来是同一个东西。
+    return Theme.primarySoft(setting);
   }
 
   /** 顶栏 / 侧栏的雾玻璃底（比卡片更淡，保证大面积下不过白）。 */
   static chromeBg(setting: string): string {
-    return Theme.isDark(setting) ? '#12151AD9' : '#FFFFFF';
+    return Theme.surfaceBg(setting);
   }
 
   static chromeBorder(setting: string): string {

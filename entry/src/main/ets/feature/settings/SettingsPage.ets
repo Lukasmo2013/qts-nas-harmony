@@ -8,6 +8,7 @@ import { DeviceOverview, DeviceSession, DiskInfo, FileItem, FileListResult, Serv
 import { AutoBackupConfig, AutoBackupService } from '../../service/AutoBackupService';
 import { SessionManager } from '../../service/SessionManager';
 import { NasRepository } from '../../service/NasRepository';
+import { ShareProbeResult } from '../../service/QnapApi';
 import { TransferManager } from '../../service/TransferManager';
 import { CardContainer, InfoRow, PageHeader, SectionTitle, StatusTag, ToastBar } from '../../components/CommonCards';
 import { LegalSheet } from '../../components/LegalSheet';
@@ -62,6 +63,10 @@ export struct SettingsPage {
   @State autoDraftPhoneName: string = '';
   @State autoDraftNasPath: string = '';
   @State autoDraftPersisted: boolean = false;
+  /** 共享目录诊断：把每个枚举接口的真实返回摊开给用户看，定位固件差异。 */
+  @State diagOpen: boolean = false;
+  @State diagBusy: boolean = false;
+  @State diagLines: string[] = [];
   /** 开关显示值：与持久化配置解耦，配置不全时能把开关原地弹回去。 */
   @State autoOn: boolean = false;
   /** 文件夹行的按压反馈：点击必须有视觉响应，避免「按了没反应」的错觉。 */
@@ -504,7 +509,57 @@ export struct SettingsPage {
         text: t('common.online', this.lang),
         tone: 'success'
       }).margin({ top: 8 })
+
+      Row() {
+        Text(t('settings.share.diag', this.lang))
+          .fontSize(13)
+          .fontColor(Theme.textPrimary(this.theme))
+          .layoutWeight(1)
+        Text(t('settings.share.diag.run', this.lang))
+          .fontSize(11)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Theme.buttonSoftFg(this.theme))
+          .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+          .backgroundColor(Theme.buttonSoftBg(this.theme))
+          .borderRadius(9)
+          .border({ width: 1, color: Theme.buttonSoftBorder(this.theme) })
+          .onClick(() => {
+            this.openShareDiag();
+          })
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+      .padding({ top: 12 })
+      .margin({ top: 12 })
+      .border({ width: { top: 1 }, color: Theme.divider(this.theme) })
     }
+  }
+
+  /** 拉一次共享诊断：并发跑全部候选接口，把长度 / 解析结果 / 片段列出来。 */
+  async openShareDiag(): Promise<void> {
+    this.diagOpen = true;
+    if (this.diagBusy) {
+      return;
+    }
+    this.diagBusy = true;
+    this.diagLines = [];
+    try {
+      const list: string[] = await NasRepository.shares();
+      this.diagLines.push(t('settings.share.diag.current', this.lang) + ' ' +
+        (list.length > 0 ? list.join(', ') : '—'));
+      const results: ShareProbeResult[] = await NasRepository.diagnoseShares();
+      for (const r of results) {
+        const names: string = r.names.length > 0 ? r.names.join(', ') : '—';
+        this.diagLines.push(r.url);
+        this.diagLines.push('  len=' + String(r.length) + ' · names=' + names);
+        if (r.snippet.length > 0) {
+          this.diagLines.push('  ' + r.snippet);
+        }
+      }
+    } catch (e) {
+      this.diagLines.push(String(e));
+    }
+    this.diagBusy = false;
   }
 
   @Builder
@@ -1814,6 +1869,77 @@ export struct SettingsPage {
     .alignItems(HorizontalAlign.Start)
   }
 
+  /** 共享目录诊断层：小字等宽输出，用户可直接截图反馈固件差异。 */
+  @Builder
+  shareDiagLayer() {
+    Column() {
+      Row() {
+        Text(t('settings.share.diag.title', this.lang))
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Theme.textPrimary(this.theme))
+          .layoutWeight(1)
+        Image($r('app.media.ic_close'))
+          .width(18)
+          .height(18)
+          .fillColor(Theme.textSecondary(this.theme))
+          .accessibilityText(t('action.close', this.lang))
+          .onClick(() => {
+            this.diagOpen = false;
+          })
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+
+      if (this.diagBusy) {
+        Row() {
+          LoadingProgress().width(20).height(20).color(Theme.PRIMARY)
+        }
+        .width('100%')
+        .height(80)
+        .justifyContent(FlexAlign.Center)
+      } else {
+        Scroll() {
+          Column() {
+            ForEach(this.diagLines, (line: string, idx: number) => {
+              Text(line)
+                .fontSize(9)
+                .lineHeight(13)
+                .fontColor(Theme.textSecondary(this.theme))
+                .width('100%')
+                .margin({ bottom: 4 })
+            }, (line: string, idx: number) => 'diag-' + String(idx))
+          }
+          .width('100%')
+          .alignItems(HorizontalAlign.Start)
+        }
+        .width('100%')
+        .layoutWeight(1)
+        .scrollBar(BarState.Off)
+        .margin({ top: 10 })
+      }
+
+      Button(t('action.close', this.lang), { type: ButtonType.Capsule })
+        .width('100%')
+        .height(38)
+        .fontSize(13)
+        .fontColor(Theme.buttonPrimaryFg(this.theme))
+        .backgroundColor(Theme.buttonPrimaryBg(this.theme))
+        .margin({ top: 10 })
+        .onClick(() => {
+          this.diagOpen = false;
+        })
+    }
+    .width('100%')
+    .height(460)
+    .padding(18)
+    .backgroundColor(Theme.cardBg(this.theme))
+    .border({ width: 1, color: Theme.surfaceBorder(this.theme) })
+    .borderRadius(20)
+    .shadow(Theme.surfaceShadow(this.theme))
+    .alignItems(HorizontalAlign.Start)
+  }
+
   @Builder
   folderPicker() {
     Column() {
@@ -2193,6 +2319,18 @@ export struct SettingsPage {
         .backgroundColor(Theme.scrim(this.theme))
         .justifyContent(FlexAlign.End)
         .padding({ left: 12, right: 12, bottom: 12 })
+      }
+
+      if (this.diagOpen) {
+        Column() {
+          this.shareDiagLayer()
+        }
+        .width('100%')
+        .height('100%')
+        .backgroundColor(Theme.scrim(this.theme))
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+        .padding({ left: 24, right: 24 })
       }
 
       if (this.legalKind.length > 0) {

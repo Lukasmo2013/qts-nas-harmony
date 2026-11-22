@@ -1471,7 +1471,7 @@ export struct LoginPage {
     .backgroundBlurStyle(Theme.glassBlur(this.theme))
     .border({ width: 1, color: Theme.glassBorder(this.theme) })
     .borderRadius(20)
-    .shadow({ radius: 20, color: Theme.glassShadow(this.theme), offsetY: 6 })
+    .shadow(Theme.surfaceShadow(this.theme))
     .alignItems(HorizontalAlign.Start)
   }
 

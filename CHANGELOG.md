@@ -8,6 +8,39 @@
 
 ---
 
+## 2.1.7 · 2026-11-22
+
+### 修复：共享目录仍只显示 Public / Container
+
+- `privRequest` 改用 `refresh=1`：`refresh=0` 可能命中只含默认共享的设备缓存。
+- 候选接口由 5 个扩到 **8 个**：`FileStation6 get_tree(node=/, node=share)`、`get_list(path=/)`、
+  `filemanager get_tree`（新旧两版）、`manaRequest get_share_list`、`get_share&read=1`、`privRequest`；
+  并行发起、取并集，最坏 6 秒。
+- **兜底探测**：8 个接口全部无结果时，用 20 个 QTS 常见共享名（Data / Download / Multimedia / Web /
+  Homes / Backup / Photo / Music / Video / Recordings / Qsync / TimeMachine / Virtualization…）
+  逐个 `get_list` 校验，存在的直接纳入。只在枚举失败时执行，正常固件不额外耗时。
+- **网络熔断**：探测中连续两次请求级失败（`status < 0`）立即停止，候选上限 40，
+  避免 NAS 不可达时首屏被拖到几十秒。
+- 新增 **「我的 → 网络与连接 → 共享目录诊断」**：一键列出每个候选接口的返回长度、解析到的共享名与前 120
+  字符片段。固件字段与预期不一致时，用户直接截图即可定位，不用再盲猜。
+
+### 设计：全 app 的「框」统一为一套规格
+
+- 新增 `surface*` 表面令牌（`surfaceBg / surfaceBorder / surfaceShadowColor / surfaceShadow / floatingShadow`），
+  卡片、底部导航栏、顶栏、侧栏、各页弹层、自动备份配置层、共享诊断层**全部指向同一套**：
+  纯白 `#FFFFFF` + 1px 冷灰描边 `#E6E8EC` + 投影 `rgba(20,32,58,0.10)`（r16/y5），悬浮底栏仅半径放大到 r22/y8。
+- 底栏选中胶囊改用 `primarySoft`，与侧栏选中态同一令牌 —— 同一件事在两处看起来完全一样。
+- `CardContainer` 取消「glass / 非 glass」两套外观（此前非 glass 卡片**无投影**、描边色也不同，正是"同一个框不一样"的来源）。
+- `ToastBar` 投影、登录页弹层投影一并收敛到 `surfaceShadow`。
+
+### 工程
+
+- `validate_project.py` PASS（ZH=EN=633，新增 4 条诊断文案）；release 编译 BUILD SUCCESSFUL（0 error）。
+- 分发包：`dist/QnapNasManager-2.1.7-unsigned.hap`，SHA-256
+  `2dd3c9613971daa32177e1d0d71a091b1870c412825ccdee7246ea081e2b01a1`。
+
+---
+
 ## 2.1.6 · 2026-11-22
 
 ### 修复：文件页共享目录不完整（Data 等自建共享缺失）

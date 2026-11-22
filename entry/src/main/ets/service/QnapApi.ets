@@ -414,6 +414,36 @@ interface SessionRelayPeek {
   relayCookie?: string;
 }
 
+/** 共享枚举候选接口：不同固件的可用项不同，逐个并行试探后取并集。 */
+const SHARE_ENUM_PATHS: string[] = [
+  '/FileStation6/utilRequest.cgi?func=get_tree&node=/&is_iso=0&media=2',
+  '/FileStation6/utilRequest.cgi?func=get_tree&node=share&is_iso=0',
+  '/FileStation6/utilRequest.cgi?func=get_list&path=%2F&limit=-1&offset=0',
+  '/cgi-bin/filemanager/utilRequest.cgi?func=get_tree&node=/&is_iso=0',
+  '/cgi-bin/filemanager/utilRequest.cgi?func=get_tree&node=share',
+  '/cgi-bin/management/manaRequest.cgi?subfunc=get_share_list',
+  '/cgi-bin/management/manaRequest.cgi?subfunc=get_share&read=1',
+  '/cgi-bin/priv/privRequest.cgi?subfunc=share&read=2&refresh=1'
+];
+
+/**
+ * QTS 常见共享名：仅在「枚举接口全部失效」时用于兜底探测。
+ * 顺序按命中概率排列，全部走 get_list 校验，不存在的会被丢弃。
+ */
+const KNOWN_QTS_SHARES: string[] = [
+  'Data', 'Public', 'Download', 'Multimedia', 'Web', 'Container', 'Home', 'homes',
+  'Backup', 'Photos', 'Photo', 'Music', 'Video', 'Videos', 'Recordings', 'Qsync',
+  'TimeMachine', 'Virtualization', 'VM', 'Snapshot'
+];
+
+/** 共享诊断结果：给「设置 → 共享目录诊断」用，便于定位固件差异。 */
+export interface ShareProbeResult {
+  url: string;
+  length: number;
+  names: string[];
+  snippet: string;
+}
+
 export class QnapApi {
   static readonly DEFAULT_PORT: number = 5000;
   /** QNAP ID（myQNAPcloud 域名）接入的默认端口：QTS 标准 HTTPS 端口。 */
@@ -1714,7 +1744,7 @@ export class QnapApi {
     if (QnapApi.shareCache.length > 0) {
       return QnapApi.shareCache;
     }
-    const url = QnapApi.baseUrl() + '/cgi-bin/priv/privRequest.cgi?subfunc=share&read=2&refresh=0';
+    const url = QnapApi.baseUrl() + '/cgi-bin/priv/privRequest.cgi?subfunc=share&read=2&refresh=1';
     const candidates: string[] = [];
     /** 设备在「共享清单」里明确列出的项：探测失败也保留，否则只读共享会被误过滤。 */
     const explicit: string[] = [];
@@ -1761,15 +1791,35 @@ export class QnapApi {
     for (const name of enumerated) {
       push(candidates, name);
     }
+    // 4b) 兜底：枚举接口全部失效时，用 QTS 常见共享名逐个探测。
+    //     只在「枚举一无所获」时执行，正常固件不会因此多花时间。
+    if (enumerated.length === 0) {
+      for (const known of KNOWN_QTS_SHARES) {
+        if (candidates.indexOf(known) < 0) {
+          candidates.push(known);
+        }
+      }
+    }
 
     // 5) 校验：清单内明确存在的直接采用；枚举出来的逐个确认可列举，过滤掉误解析的字段。
+    //    连续两次请求级失败（status<0）说明网络或会话已不可用，立即停止探测，避免拖慢首屏。
     const valid: string[] = [];
-    for (const name of candidates) {
+    let netFail: number = 0;
+    const limit: number = candidates.length > 40 ? 40 : candidates.length;
+    for (let i = 0; i < limit; i++) {
+      const name: string = candidates[i];
       if (explicit.indexOf(name) >= 0) {
         valid.push('/' + name);
         continue;
       }
       const probe = await QnapApi.files('/' + name, 1);
+      if (probe.status < 0) {
+        netFail++;
+        if (netFail >= 2) {
+          break;
+        }
+        continue;
+      }
       if (probe.valid) {
         valid.push('/' + name);
       }
@@ -1805,13 +1855,7 @@ export class QnapApi {
    * 全部失败时返回空数组，调用方仍保留 privRequest 的结果。
    */
   private static async enumerateShares(): Promise<string[]> {
-    const paths: string[] = [
-      '/FileStation6/utilRequest.cgi?func=get_tree&node=/&is_iso=0&media=2',
-      '/FileStation6/utilRequest.cgi?func=get_tree&node=share&is_iso=0',
-      '/cgi-bin/filemanager/utilRequest.cgi?func=get_tree&node=/&is_iso=0',
-      '/cgi-bin/management/manaRequest.cgi?subfunc=get_share_list',
-      '/cgi-bin/management/manaRequest.cgi?subfunc=get_share&read=1'
-    ];
+    const paths: string[] = SHARE_ENUM_PATHS;
     const tasks: Promise<string>[] = [];
     for (const path of paths) {
       tasks.push(QnapApi.tryBody(path));
@@ -1840,6 +1884,30 @@ export class QnapApi {
     } catch (e) {
       return '';
     }
+  }
+
+  /**
+   * 共享目录诊断：把每个候选接口的返回长度、解析到的名称与片段交给界面展示。
+   * 用户固件的字段名与文档不一致时，靠这份结果精确定位，而不是继续盲猜。
+   */
+  static async diagnoseShares(): Promise<ShareProbeResult[]> {
+    const tasks: Promise<string>[] = [];
+    for (const path of SHARE_ENUM_PATHS) {
+      tasks.push(QnapApi.tryBody(path));
+    }
+    const bodies: string[] = await Promise.all(tasks);
+    const results: ShareProbeResult[] = [];
+    for (let i = 0; i < SHARE_ENUM_PATHS.length; i++) {
+      const body: string = bodies[i];
+      const names: string[] = body.length > 0 ? QnapApi.shareNamesFrom(body) : [];
+      results.push({
+        url: SHARE_ENUM_PATHS[i],
+        length: body.length,
+        names: names,
+        snippet: body.substring(0, 120).replace(/\s+/g, ' ')
+      });
+    }
+    return results;
   }
 
   /** 从 JSON / XML 响应里提取共享名（两种格式都做，避免依赖单一固件格式）。 */

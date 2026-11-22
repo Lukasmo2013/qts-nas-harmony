@@ -102,13 +102,12 @@ export struct CardContainer {
     .borderRadius(BreakpointSystem.cardRadius(this.bp))
     .alignItems(HorizontalAlign.Start)
     .margin({ bottom: BreakpointSystem.contentGap(this.bp) })
-    .backgroundColor(this.glass ? Theme.glassBg(this.theme) : Theme.cardBg(this.theme))
-    .border({ width: 1, color: this.glass ? Theme.glassBorder(this.theme) : Theme.hairline(this.theme) })
-    // 鸿蒙 7 雾玻璃：组分模糊 + 半透明底 + 1px 冷灰描边 + 大半径浅投影。
+    // 全 app 的「框」只有一套外观：纯白底 + 1px 冷灰描边 + 柔和投影。
+    // glass 只影响深色模式下的背景模糊，避免同一类容器出现两种视觉规格。
+    .backgroundColor(Theme.cardBg(this.theme))
+    .border({ width: 1, color: Theme.surfaceBorder(this.theme) })
     .backgroundBlurStyle(this.glass ? Theme.glassBlur(this.theme) : BlurStyle.NONE)
-    .shadow(this.glass
-      ? Theme.cardShadow(this.theme)
-      : { radius: 0, color: Color.Transparent, offsetY: 0 })
+    .shadow(Theme.surfaceShadow(this.theme))
   }
 }
 
@@ -225,13 +224,12 @@ export struct MetricTile {
     .padding(BreakpointSystem.cardPadding(this.bp))
     .borderRadius(BreakpointSystem.cardRadius(this.bp))
     .alignItems(HorizontalAlign.Start)
-    .backgroundColor(this.glass ? Theme.glassBg(this.theme) : Theme.cardBg(this.theme))
-    .border({ width: 1, color: this.glass ? Theme.glassBorder(this.theme) : Theme.hairline(this.theme) })
-    // 鸿蒙 7 雾玻璃：组分模糊 + 半透明底 + 1px 冷灰描边 + 大半径浅投影。
+    // 全 app 的「框」只有一套外观：纯白底 + 1px 冷灰描边 + 柔和投影。
+    // glass 只影响深色模式下的背景模糊，避免同一类容器出现两种视觉规格。
+    .backgroundColor(Theme.cardBg(this.theme))
+    .border({ width: 1, color: Theme.surfaceBorder(this.theme) })
     .backgroundBlurStyle(this.glass ? Theme.glassBlur(this.theme) : BlurStyle.NONE)
-    .shadow(this.glass
-      ? Theme.cardShadow(this.theme)
-      : { radius: 0, color: Color.Transparent, offsetY: 0 })
+    .shadow(Theme.surfaceShadow(this.theme))
   }
 }
 
@@ -344,6 +342,7 @@ export struct SettingRow {
 export struct ToastBar {
   @Prop text: string = '';
   @Prop visible: boolean = false;
+  @StorageProp('appTheme') theme: string = 'system';
 
   build() {
     if (this.visible && this.text.length > 0) {
@@ -362,7 +361,7 @@ export struct ToastBar {
       .padding({ left: 14, right: 14, top: 12, bottom: 12 })
       .backgroundColor('#2A3038')
       .borderRadius(14)
-      .shadow({ radius: 12, color: 'rgba(20,32,58,0.18)', offsetY: 4 })
+      .shadow(Theme.surfaceShadow(this.theme))
       .margin({ bottom: 2 })
       .alignItems(VerticalAlign.Center)
     }

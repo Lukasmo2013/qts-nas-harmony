@@ -165,7 +165,7 @@ export struct AdaptiveShell {
       .borderRadius(Theme.BAR_RADIUS)
       .border({ width: 1, color: Theme.barBorder(this.theme) })
       .backgroundBlurStyle(Theme.glassBlur(this.theme))
-      .shadow({ radius: 26, color: Theme.barShadow(this.theme), offsetY: 8 })
+      .shadow(Theme.floatingShadow(this.theme))
       .alignItems(VerticalAlign.Center)
     }
     .width('100%')

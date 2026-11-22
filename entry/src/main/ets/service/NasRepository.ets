@@ -11,7 +11,7 @@ import {
   ContainerInfo, ContainerListResult, ContainerLogs, ImageInfo, EventItem, StorageBundle, OpResult,
   DownloadResult
 } from '../model/Models';
-import { QnapApi } from './QnapApi';
+import { QnapApi, ShareProbeResult } from './QnapApi';
 import { DemoMode } from '../common/demo/DemoMode';
 
 export class NasRepository {
@@ -91,6 +91,14 @@ export class NasRepository {
   /** 清空共享 / 可写缓存：下拉刷新与重新进页时调用，保证新增共享能立刻出现。 */
   static resetShareCache(): void {
     QnapApi.resetShareCache();
+  }
+
+  /** 共享目录诊断：各候选接口的真实返回，仅用于排查固件差异。 */
+  static async diagnoseShares(): Promise<ShareProbeResult[]> {
+    if (DemoMode.isActive()) {
+      return [];
+    }
+    return await QnapApi.diagnoseShares();
   }
 
   /** 可写共享目录（探测得到，已缓存）：用于挑选默认落地目录与上传前提示。 */
