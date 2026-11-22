@@ -122,7 +122,6 @@ QNAP、QTS、Container Station、Tailscale 等名称与标识归各自权利人�
 | HarmonyOS 原生工程 | `AppScope/`、`entry/`、`hvigor/`、`*.json5` | DevEco Studio 6.0.0.878 实测可编译的完整源码工程 |
 | **unsigned release HAP** | `entry/build/default/outputs/default/entry-default-unsigned.hap` | 本仓库唯一分发的构建产物；签名请在本地用自有证书完成 |
 | 签名链路（可选） | `tools/sign_release.py` | 读取 `QNAP_SIGN_PASSWORD` 环境变量在本地签名，证书与口令不入库 |
-| 高保真交互预览 | `preview/index.html` | 单文件、零依赖；复刻雾玻璃 + 左右滑动新 UI，可直接双击打开 |
 | 签名与校验工具链 | `tools/` | 图标生成、静态校验、冒烟测试、证书链 / profile / HAP 签名与验签 |
 
 **本机工具链实测**：DevEco Studio `6.0.0.878`、HarmonyOS SDK `6.0.0.47 / API 20`、hvigor `6.20.2`、hap-sign-tool、hdc `3.2.0b`。debug 与 release 两种 buildMode 均已在本机真实编译通过，release 已完成签名与验签。
@@ -557,7 +556,6 @@ QnapNasHarmony/
 │               ├── files/FilesPage.ets       文件（真实 File Station 6 列表）
 │               ├── docker/DockerPage.ets     容器（真实 Container Station）
 │               └── settings/SettingsPage.ets 个人中心与设置（含存储卷 / 硬盘 / 服务）
-├── preview/index.html                交互预览（雾玻璃 + 左右滑动）
 └── tools/                           仅保留不含凭据的构建 / 校验脚本
     ├── gen_assets.py                 生成图标资源
     ├── validate_project.py           工程静态一致性校验（含 JSON5 注释）
@@ -607,11 +605,9 @@ python tools/sign_release.py --verify-only  # 只复核现有 profile 与 signed
 
 链路：`generate-keypair → generate-csr → generate-ca(root) → generate-ca(app/profile 子 CA) → generate-app-cert / generate-profile-cert(certChain) → sign-profile → verify-profile → sign-app → verify-app`。全部 9 步在本机通过，`Digest verify result: true`。
 
-### 交互预览（无需 SDK）
+### 交互预览
 
-1. （可选，接真实数据）本机自备一个 QTS 桥接代理即可；接口结构需与 ArkTS 端 `DeviceOverview` / `StorageBundle` / `ServiceInfo` / `ContainerListResult` 一致，预览即所见即真机所见。代理脚本含设备地址与凭据，**属于本机私有工具，不随仓库分发**。
-2. 浏览器打开 `preview/index.html`：顶部工具条可切换 **手机 / 平板**、**中文 / English**、**浅色 / 深色**；登录卡顶部的两枚胶囊可在 **本地 IP / QNAP ID** 间切换（ID 模式走 `<name>.myqnapcloud.com` + 8081/443 探测）；进入后**左右滑动**在四个页面（设备主页 / 文件 / 容器 / 我的）间切换，所有卡片为雾玻璃框，手机底栏是**悬浮圆角雾玻璃长条**。
-3. 文件页的**新建 / 重命名 / 删除**会真的打到设备（`POST /api/mkdir|rename|delete`，与真机同一套 FS6 form-urlencoded 契约），删除为移入 `@Recycle`；容器页在未装 Container Station 的设备上显示「未安装」引导页而非空列表。代理未启动时可点「离线预览界面」查看 UI（真实空态，无假数据）。
+交互预览页（单文件 HTML）**不随本仓库分发**，以免仓库中出现与原生工程重复的 UI 实现。预览效果请直接编译运行原生工程；`tools/validate_preview.py` 与 `tools/smoke_preview.js` 仅在有本地预览文件时用于自检。
 
 ---
 
@@ -644,7 +640,7 @@ python tools/sign_release.py --verify-only  # 只复核现有 profile 与 signed
   内层区块（输入框 / 次级按钮 / 图标底）为中性浅灰 `#F7F8FA` / `#F2F3F5`，不带任何色相，避免整屏偏色；
   强调色为天青蓝 `#2E6AD6`（白底对比度 5.0:1，仅用于按钮 / 选中 / 链接等小面积），大面积图表用低饱和墨蓝 `#7E93B8`，
   成功 `#2E8B6B` / 注意态冷灰 `#6B7480` / 危险 `#C0524C` 均去饱和处理。深色模式同步一套
-  （`#151920 → #0A0C10` 基底 / `#171A20` 卡片）。`Theme.ets` 为唯一样式来源，`preview/index.html` 的 CSS 变量与之逐一对应。
+  （`#151920 → #0A0C10` 基底 / `#171A20` 卡片）。`Theme.ets` 为唯一样式来源，所有页面与组件的配色均从该处令牌取值，不散落硬编码色值。
   - 浅底按钮三件套 `buttonSoftBg / buttonSoftFg / buttonSoftBorder`：**禁止**再用「白字 + 浅色底」的组合，
     这类写法对比度接近 1:1，等同隐形（2.1.5 修复的自动备份开关即为此类问题）。
   - 原警告色 `#B08A4E`（暖黄褐）已改为冷灰 `#6E7681`，`color.json` 同步 `warning #F5A623 → #6B7480`、`primary #0A59F7 → #2E6AD6`、`success #31B773 → #2E8B6B`、`danger #E5544B → #C0524C`。
@@ -844,7 +840,6 @@ python tools/sign_release.py --verify-only  # 只复核现有 profile 与 signed
 - 审核截图建议直接使用登录页「审核预览账号 → 进入预览」：主界面顶部常驻「预览模式」提示条，
   所有内容均为内置示例，不涉及真实设备或账号；预览模式下的写操作不会生效。
 - 截图中使用文档保留地址 `192.0.2.10` 与中性账号 `demo-user`，密码栏一律留空。
-- 本仓库的 `preview/index.html` 仅用于交互预览，不自动填入任何凭据；预览页的示例不得作为商店截图直接提交。
 - 错误提示默认展示可操作的友好说明，引擎诊断串折叠在「显示诊断信息」之后；截图请保持默认状态。
 
 ### 11.6 仍需人工补充或确认
