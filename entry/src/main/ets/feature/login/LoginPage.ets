@@ -127,6 +127,8 @@ export struct LoginPage {
   /** 上次自动重连扩展的时间，避免高频重启与系统抢占。 */
   private tsRestartAt: number = 0;
   private tsStartAt: number = 0;
+  /** 自动前进到「选 NAS 地址」是否已排队，防止轮询重复触发。 */
+  private tsAutoNextPending: boolean = false;
   private tsContext: common.UIAbilityContext | undefined = undefined;
   private tsWebCtl: webview.WebviewController = new webview.WebviewController();
 
@@ -588,6 +590,7 @@ export struct LoginPage {
     this.tsEngineErr = '';
     this.tsLastBeat = 0;
     this.tsRestartAt = 0;
+    this.tsAutoNextPending = false;
     this.showFailure = false;
     try {
       const ctx: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
@@ -627,7 +630,9 @@ export struct LoginPage {
     if (this.tsBusy || this.tsContext === undefined) {
       return;
     }
-    if (this.tsPhase !== 'auth') {
+    // 进入「选地址」后继续轮询：VPN 稍后连上时，候选节点会自动补进列表，
+    // 不需要用户退回上一步再点一次。
+    if (this.tsPhase !== 'auth' && this.tsPhase !== 'pick') {
       return;
     }
     const st: TsConnectState = TailscaleService.poll(this.tsContext);
@@ -671,7 +676,12 @@ export struct LoginPage {
       this.tsAuthBlock = '';
       // 真实授权 URL 晚到时切过去（官网兜底页 -> 带 key 的授权页）。
       this.tsApplyAuthUrl(st.authUrl);
+      if (this.tsPhase === 'pick') {
+        return;
+      }
       this.tsStage = 'login.ts.auth.ok';
+      // 授权完成即自动进入选地址，省掉一次点击（用户要的是「顺畅、快捷」）。
+      this.tsAutoNext();
       return;
     }
     if (st.state === 'needs_login') {
@@ -794,37 +804,40 @@ export struct LoginPage {
     }
   }
 
-  /** 兜底出口：VPN 始终连不上时，允许直接用 IP 登录（同一局域网仍可达）。 */
-  private tsSkipEngine(): void {
-    this.stopTsWatch();
-    this.tsEngineErr = '';
-    this.tsAuthBlock = '';
-    this.tsStage = '';
-    this.tsPickedIp = '';
-    this.tsIpErr = '';
-    this.tsPhase = 'pick';
-  }
-
   /**
    * Tailscale 登录页的「下一步」：
    * - 尚未连上 tailnet：提示用户先在页面里登录，不推进；
    * - 已连上：收集到的节点带到选 IP 步骤。
    */
   private tsAuthNext(): void {
-    if (!this.tsAuthed) {
-      // 必须给强反馈：原来只改一行小字，用户以为按钮坏了。
-      // 同时「跳过 VPN」按钮就在下面，是明确出口。
-      this.tsAuthBlock = 'login.ts.auth.blocked';
-      this.tsStage = 'login.ts.auth.wait';
-      return;
-    }
+    // 关键修复：主按钮**不再**因为「引擎没报 running」而被拦下。
+    // 真机上 VPN 扩展经常被系统回收，状态文件变成旧快照（心跳超时），
+    // 此时用户其实已在网页里完成授权，旧逻辑却永远点不动「下一步」。
+    // 现在一律前进到选地址；未连上时该页顶部会明确提示改填局域网 IP。
     this.tsAuthBlock = '';
-    this.stopTsWatch();
     this.tsAuthUrl = '';
     this.tsStage = '';
     this.tsPickedIp = this.tsCandidates.length === 1 ? this.tsCandidates[0].address : '';
     this.tsIpErr = '';
     this.tsPhase = 'pick';
+    // 注意：不 stopTsWatch()，保持轮询以便自动补齐候选节点。
+  }
+
+  /**
+   * 授权完成后的自动前进：延时 900ms 让「已连接」状态先闪一下，
+   * 避免用户在完全没看到反馈的情况下被瞬间切页。
+   */
+  private tsAutoNext(): void {
+    if (this.tsAutoNextPending) {
+      return;
+    }
+    this.tsAutoNextPending = true;
+    setTimeout(() => {
+      this.tsAutoNextPending = false;
+      if (this.tsPhase === 'auth' && this.tsAuthed) {
+        this.tsAuthNext();
+      }
+    }, 900);
   }
 
   /** 从「选 IP」退回 Tailscale 登录页，并恢复状态轮询（否则回去后永远等不到 Running）。 */
@@ -908,6 +921,7 @@ export struct LoginPage {
   /** 返回上一步 / 关闭向导：清空阶段状态。 */
   private resetTsFlow(): void {
     this.stopTsWatch();
+    this.tsAutoNextPending = false;
     this.tsPhase = '';
     this.tsStage = '';
     this.tsAuthUrl = '';
@@ -1034,7 +1048,7 @@ export struct LoginPage {
     }
     .padding({ left: 12, right: 12, top: 8, bottom: 8 })
     .backgroundColor(Theme.glassBg(this.theme))
-    .backgroundBlurStyle(Theme.glassBlur())
+    .backgroundBlurStyle(Theme.glassBlur(this.theme))
     .border({ width: 1, color: Theme.glassBorder(this.theme) })
     .borderRadius(18)
     .onClick(() => {
@@ -1454,7 +1468,7 @@ export struct LoginPage {
     .width('100%')
     .padding(22)
     .backgroundColor(Theme.glassBg(this.theme))
-    .backgroundBlurStyle(Theme.glassBlur())
+    .backgroundBlurStyle(Theme.glassBlur(this.theme))
     .border({ width: 1, color: Theme.glassBorder(this.theme) })
     .borderRadius(20)
     .shadow({ radius: 20, color: Theme.glassShadow(this.theme), offsetY: 6 })
@@ -1703,7 +1717,7 @@ export struct LoginPage {
           : t('login.ts.authLink.state', this.lang) + t('login.ts.authLink.missing', this.lang))
           .fontSize(9)
           .lineHeight(13)
-          .fontColor(this.tsAuthUrlReal ? Theme.SUCCESS : Theme.DANGER)
+          .fontColor(this.tsAuthUrlReal ? Theme.SUCCESS : Theme.textSecondary(this.theme))
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .width('100%')
@@ -1821,17 +1835,14 @@ export struct LoginPage {
             .onClick(() => {
               this.tsRecheck();
             })
-          // 兜底出口：VPN 始终连不上时仍可用局域网 IP 登录，避免流程死锁。
-          Button(t('login.ts.auth.skip', this.lang), { type: ButtonType.Normal })
-            .width('100%')
-            .height(34)
-            .fontSize(12)
+          // 主按钮本身已经无条件放行，这里只补充一句说明，避免两个按钮做同一件事。
+          Text(t('login.ts.nextIp.hint', this.lang))
+            .fontSize(10)
+            .lineHeight(15)
             .fontColor(Theme.textSecondary(this.theme))
-            .backgroundColor(Color.Transparent)
+            .width('100%')
+            .textAlign(TextAlign.Center)
             .margin({ top: 2 })
-            .onClick(() => {
-              this.tsSkipEngine();
-            })
         }
       }
       .width('100%')

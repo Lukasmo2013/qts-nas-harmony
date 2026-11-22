@@ -8,6 +8,46 @@
 
 ---
 
+## 2.1.6 · 2026-11-22
+
+### 修复：文件页共享目录不完整（Data 等自建共享缺失）
+
+- **根因**：`privRequest.cgi?subfunc=share&read=2` 只返回 `defShareList`（默认共享，如 Public）与
+  `no_del_list`（系统共享，如 Container）。**用户自建的共享根本不在这个响应里**，2.1.5 只是把同一份名单
+  解析得更全，没有换数据源，所以问题依旧。
+- 改为**多源合并**：`privRequest` + File Station 目录树（`func=get_tree&node=/`）+
+  共享管理（`manaRequest.cgi?subfunc=get_share_list`）等 4 个候选接口，按顺序尝试，取第一个可用结果；
+  JSON（`datas / nodes / items / data` 中的 `path / text / name / filename`）与
+  XML（`share_name / shareName / share / name`）双解析。
+- 枚举出的名字逐个 `get_list` 校验，过滤误解析字段（如把 `<name>` 当成共享名）；
+  最终按名称排序，与主机 File Station 的字母序一致。
+
+### 修复：卡片底色偏浅黄 → 纯白
+
+- 根因：浅色模式卡片是 0.8 透明 + 背景模糊，会采样窗口背后的壁纸 / 主题色，暖色壁纸把整块卡片染成浅黄。
+- 浅色模式卡片改为**纯白不透明并关闭背景模糊**；底栏 / 顶栏 / 侧栏改近纯白；
+  内层区块（输入框、次级按钮、图标底）改**中性浅灰** `#F7F8FA / #F2F3F5`（去掉蓝调）；
+  页面渐变改中性灰阶 `#F7F8FA → #EDEFF2`。深色模式保留 `COMPONENT_THICK` 雾玻璃。
+
+### 修复：Tailscale 登录后卡在「下一步·选择 NAS 地址」
+
+- 根因：`tsAuthNext()` 在 `tsAuthed === false` 时直接 return，只改一行小字。真机上 VPN 扩展常被系统回收，
+  心跳超时导致 `tsAuthed` 永远为 false —— 用户明明已在网页完成授权，按钮却永远点不动，流程死锁。
+- 现在主按钮**无条件放行**到「选 NAS 地址」；未连上 VPN 时该页顶部明确提示改填局域网 IP。
+- 引擎变为 running（授权成功）后 **900ms 自动进入选地址**，省掉一次点击。
+- 进入选地址后**继续轮询**：VPN 稍后连上，候选节点自动补进列表，无需退回上一步。
+- 去掉与之重复的「VPN 连不上？直接用 IP 登录」次要按钮，改为一行说明；
+  「授权链接未取到」由红色警告改为次级文字色，避免把可继续的流程渲染成故障。
+
+### 工程
+
+- 仿真用例同步新流程（failed → 下一步放行、pick 阶段轮询补候选），全部通过。
+- `validate_project.py` PASS（ZH=EN=629，新增 `login.ts.nextIp.hint`）；release 编译 BUILD SUCCESSFUL。
+- 分发包：`dist/QnapNasManager-2.1.6-unsigned.hap`，SHA-256
+  `24556ec92fe2c556056eecb34e5cd679da1320a675dc8a2360cfd84bbb73f830`。
+
+---
+
 ## 2.1.5 · 2026-11-22
 
 ### 修复：共享目录只看得到 Public / Container

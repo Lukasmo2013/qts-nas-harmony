@@ -66,7 +66,8 @@ class Page:
 
     # ---------- tsTick() ----------
     def tick(self, st):
-        if self.tsPhase != AUTH:
+        # 进入「选地址」后继续轮询：VPN 稍后连上时候选会自动补进列表
+        if self.tsPhase not in (AUTH, PICK):
             return
         # 存活检测：状态文件超过 8 秒没心跳 = 扩展已被回收，内容只是旧快照
         age = st.get('age', 0)
@@ -92,7 +93,10 @@ class Page:
             if st.get('authUrl') and not self.tsAuthUrlReal:
                 self.tsAuthUrl = st['authUrl']
                 self.tsAuthUrlReal = True
+            if self.tsPhase == PICK:
+                return
             self.tsStage = 'login.ts.auth.ok'
+            self.auto_next = True
             return
         if state == 'needs_login':
             if st.get('authUrl') and not self.tsAuthUrlReal:
@@ -106,10 +110,9 @@ class Page:
 
     # ---------- tsAuthNext() ----------
     def auth_next(self):
-        if not self.tsAuthed:
-            self.tsStage = 'login.ts.auth.wait'
-            return False
-        self.timer = None
+        # 2.1.6 起：主按钮无条件放行。引擎心跳可能因系统回收而假死，
+        # 但用户往往已在网页里完成授权，旧逻辑会把「下一步」永久卡死。
+        self.tsAuthBlock = ''
         self.tsAuthUrl = ''
         self.tsStage = ''
         self.tsPickedIp = self.tsCandidates[0]['address'] if len(self.tsCandidates) == 1 else ''
@@ -209,23 +212,25 @@ def run():
     ok = ok and good
     print(f'  [{"OK" if good else "FAIL"}] running -> 点「下一步」 -> pick，预填 {p.tsPickedIp}')
 
-    # C: failed -> 下一步被拦截（不能穿过未连接的 VPN 去登录）
+    # C: failed -> 下一步仍然放行到 pick（VPN 未连接时由该页提示改填局域网 IP）
     p = Page()
     p.tailscale_login(True)
     p.tick({'state': 'failed', 'detail': 'boom'})
     advanced = p.auth_next()
-    good = (advanced is False) and p.tsPhase == AUTH and p.tsStage == 'login.ts.auth.wait'
+    good = advanced and p.tsPhase == PICK and p.tsAuthed is False
     ok = ok and good
-    print(f'  [{"OK" if good else "FAIL"}] failed -> 点「下一步」被拦截，仍在登录页（stage={p.tsStage}）')
+    print(f'  [{"OK" if good else "FAIL"}] failed -> 点「下一步」-> pick（未连 VPN 也放行，page={p.tsPhase}）')
 
-    # C: failed -> 跳过 VPN -> pick（兜底出口不死锁）
+    # D: pick 阶段继续轮询，VPN 连上后候选自动补齐
     p = Page()
     p.tailscale_login(True)
     p.tick({'state': 'failed', 'detail': 'boom'})
-    p.skip_engine()
-    good = p.tsPhase == PICK
+    p.auth_next()
+    p.tick({'state': 'running', 'authUrl': '',
+            'candidates': [{'name': 'myserver', 'address': '100.64.0.5'}]})
+    good = p.tsPhase == PICK and p.tsAuthed is True and len(p.tsCandidates) == 1
     ok = ok and good
-    print(f'  [{"OK" if good else "FAIL"}] failed -> 点「跳过 VPN」-> pick（局域网友好出口）')
+    print(f'  [{"OK" if good else "FAIL"}] pick 阶段轮询 -> 自动补齐候选 {len(p.tsCandidates)} 个')
 
     # VPN 授权被拒：不进登录页，直接失败（合理）
     p = Page()

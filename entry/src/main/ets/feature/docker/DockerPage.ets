@@ -695,7 +695,7 @@ export struct DockerPage {
     .width('100%')
     .padding(20)
     .backgroundColor(Theme.glassBg(this.theme))
-    .backgroundBlurStyle(Theme.glassBlur())
+    .backgroundBlurStyle(Theme.glassBlur(this.theme))
     .border({ width: 1, color: Theme.glassBorder(this.theme) })
     .borderRadius(20)
     .shadow(Theme.cardShadow(this.theme))

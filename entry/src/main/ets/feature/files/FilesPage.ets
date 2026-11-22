@@ -1092,7 +1092,7 @@ export struct FilesPage {
     .padding(14)
     .backgroundColor(Theme.glassBg(this.theme))
     .border({ width: 1, color: Theme.glassBorder(this.theme) })
-    .backgroundBlurStyle(Theme.glassBlur())
+    .backgroundBlurStyle(Theme.glassBlur(this.theme))
     .borderRadius(14)
     .onClick(() => {
       if (this.selectMode) {
@@ -1371,7 +1371,7 @@ export struct FilesPage {
     .width('100%')
     .padding(20)
     .backgroundColor(Theme.glassBg(this.theme))
-    .backgroundBlurStyle(Theme.glassBlur())
+    .backgroundBlurStyle(Theme.glassBlur(this.theme))
     .border({ width: 1, color: Theme.glassBorder(this.theme) })
     .borderRadius(20)
     .shadow(Theme.cardShadow(this.theme))

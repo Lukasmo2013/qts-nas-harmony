@@ -164,7 +164,7 @@ export struct AdaptiveShell {
       .backgroundColor(Theme.barBg(this.theme))
       .borderRadius(Theme.BAR_RADIUS)
       .border({ width: 1, color: Theme.barBorder(this.theme) })
-      .backgroundBlurStyle(Theme.glassBlur())
+      .backgroundBlurStyle(Theme.glassBlur(this.theme))
       .shadow({ radius: 26, color: Theme.barShadow(this.theme), offsetY: 8 })
       .alignItems(VerticalAlign.Center)
     }
@@ -240,7 +240,7 @@ export struct AdaptiveShell {
     .width(BreakpointSystem.sideBarWidth(this.bp))
     .height('100%')
     .backgroundColor(Theme.chromeBg(this.theme))
-    .backgroundBlurStyle(Theme.glassBlur())
+    .backgroundBlurStyle(Theme.glassBlur(this.theme))
     .border({ width: { right: 1 }, color: Theme.chromeBorder(this.theme) })
     .alignItems(HorizontalAlign.Start)
   }
@@ -317,7 +317,7 @@ export struct AdaptiveShell {
     .height(BreakpointSystem.topBarHeight(this.bp))
     .padding({ left: BreakpointSystem.pagePadding(this.bp), right: BreakpointSystem.pagePadding(this.bp) })
     .backgroundColor(Theme.chromeBg(this.theme))
-    .backgroundBlurStyle(Theme.glassBlur())
+    .backgroundBlurStyle(Theme.glassBlur(this.theme))
     .border({ width: { bottom: 1 }, color: Theme.chromeBorder(this.theme) })
     .alignItems(VerticalAlign.Center)
   }

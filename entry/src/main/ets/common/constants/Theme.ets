@@ -53,7 +53,7 @@ export class Theme {
 
   /** 页面底色：冷调浅灰蓝，衬出悬浮的玻璃卡片。 */
   static pageBg(setting: string): string {
-    return Theme.isDark(setting) ? '#0D0F13' : '#F1F3F7';
+    return Theme.isDark(setting) ? '#0D0F13' : '#F4F5F7';
   }
 
   static cardBg(setting: string): string {
@@ -62,7 +62,8 @@ export class Theme {
 
   /** 次级容器：输入框、内嵌块、选中行。 */
   static subCardBg(setting: string): string {
-    return Theme.isDark(setting) ? '#22262E' : '#F2F5F9';
+    // 中性浅灰（不带蓝/黄色相）：在白卡片里既能区分区块，又不会让整屏偏色。
+    return Theme.isDark(setting) ? '#22262E' : '#F7F8FA';
   }
 
   /** 导航 / 顶栏：与页面底色拉开一档，但不使用纯白刺眼。 */
@@ -72,12 +73,12 @@ export class Theme {
 
   /** 1px 极淡描边，替代重阴影。 */
   static hairline(setting: string): string {
-    return Theme.isDark(setting) ? '#262B34' : '#E6EAF1';
+    return Theme.isDark(setting) ? '#262B34' : '#E8EAED';
   }
 
   /** 图标底：低饱和冷灰，取代高饱和彩色圆形。 */
   static quietIconBg(setting: string): string {
-    return Theme.isDark(setting) ? '#232833' : '#EEF2F8';
+    return Theme.isDark(setting) ? '#232833' : '#F2F3F5';
   }
 
   static textPrimary(setting: string): string {
@@ -89,7 +90,7 @@ export class Theme {
   }
 
   static divider(setting: string): string {
-    return Theme.isDark(setting) ? '#23272F' : '#EBEFF5';
+    return Theme.isDark(setting) ? '#23272F' : '#EDEEF0';
   }
 
   static iconTint(setting: string): string {
@@ -200,11 +201,13 @@ export class Theme {
    * 底色半透明（明 0.80 / 暗 0.80），叠系统组分模糊；
    * 描边为一圈极淡冷灰，把卡片框成一片「玻璃」而不是一整块白。 */
   static glassBg(setting: string): string {
-    return Theme.isDark(setting) ? '#191D24CC' : '#FFFFFFCC';
+    // 浅色模式用**纯白不透明**：半透明层会采样窗口背后的壁纸 / 主题色，
+    // 暖色壁纸会把整块卡片染成浅黄（2.1.5 的真机反馈），纯白是唯一稳妥解。
+    return Theme.isDark(setting) ? '#191D24CC' : '#FFFFFF';
   }
 
   static glassBorder(setting: string): string {
-    return Theme.isDark(setting) ? '#2F3541' : '#E3E9F2';
+    return Theme.isDark(setting) ? '#2F3541' : '#E6E8EC';
   }
 
   /** 玻璃片顶缘高光：叠在 1px 描边上，模拟光线掠过玻璃边缘。 */
@@ -226,9 +229,13 @@ export class Theme {
     };
   }
 
-  /** 卡片 / 底栏使用的模糊档位：COMPONENT_THICK 是鸿蒙 7 雾玻璃的推荐强度。 */
-  static glassBlur(): BlurStyle {
-    return BlurStyle.COMPONENT_THICK;
+  /**
+   * 卡片 / 底栏的模糊档位。
+   * 浅色模式一律不做背景模糊：卡片是纯白实底，模糊只会引入壁纸色偏；
+   * 深色模式保留 COMPONENT_THICK，维持鸿蒙 7 雾玻璃的通透层次。
+   */
+  static glassBlur(setting: string): BlurStyle {
+    return Theme.isDark(setting) ? BlurStyle.COMPONENT_THICK : BlurStyle.NONE;
   }
 
   /** 页面柔和渐变底：玻璃片模糊它后方，呈现通透的纵深。
@@ -236,7 +243,7 @@ export class Theme {
   static pageGradientColors(setting: string): [string, number][] {
     return Theme.isDark(setting)
       ? [['#151920', 0.0], ['#10131A', 0.45], ['#0A0C10', 1.0]]
-      : [['#F7F9FD', 0.0], ['#EFF3F9', 0.5], ['#E9EEF6', 1.0]];
+      : [['#F7F8FA', 0.0], ['#F2F4F6', 0.5], ['#EDEFF2', 1.0]];
   }
 
   /** 顶部主视觉渐晕：给页面首屏一点色相层次，不做大面积着色。 */
@@ -254,7 +261,7 @@ export class Theme {
   static readonly BAR_RADIUS: number = 26;
 
   static barBg(setting: string): string {
-    return Theme.isDark(setting) ? '#1B1F27D9' : '#FFFFFFCC';
+    return Theme.isDark(setting) ? '#1B1F27D9' : '#FFFFFFF5';
   }
 
   static barBorder(setting: string): string {
@@ -273,7 +280,7 @@ export class Theme {
 
   /** 顶栏 / 侧栏的雾玻璃底（比卡片更淡，保证大面积下不过白）。 */
   static chromeBg(setting: string): string {
-    return Theme.isDark(setting) ? '#12151AD9' : '#FBFCFEE0';
+    return Theme.isDark(setting) ? '#12151AD9' : '#FFFFFF';
   }
 
   static chromeBorder(setting: string): string {

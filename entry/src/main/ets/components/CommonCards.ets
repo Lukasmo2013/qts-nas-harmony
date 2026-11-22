@@ -105,7 +105,7 @@ export struct CardContainer {
     .backgroundColor(this.glass ? Theme.glassBg(this.theme) : Theme.cardBg(this.theme))
     .border({ width: 1, color: this.glass ? Theme.glassBorder(this.theme) : Theme.hairline(this.theme) })
     // 鸿蒙 7 雾玻璃：组分模糊 + 半透明底 + 1px 冷灰描边 + 大半径浅投影。
-    .backgroundBlurStyle(this.glass ? Theme.glassBlur() : BlurStyle.NONE)
+    .backgroundBlurStyle(this.glass ? Theme.glassBlur(this.theme) : BlurStyle.NONE)
     .shadow(this.glass
       ? Theme.cardShadow(this.theme)
       : { radius: 0, color: Color.Transparent, offsetY: 0 })
@@ -228,7 +228,7 @@ export struct MetricTile {
     .backgroundColor(this.glass ? Theme.glassBg(this.theme) : Theme.cardBg(this.theme))
     .border({ width: 1, color: this.glass ? Theme.glassBorder(this.theme) : Theme.hairline(this.theme) })
     // 鸿蒙 7 雾玻璃：组分模糊 + 半透明底 + 1px 冷灰描边 + 大半径浅投影。
-    .backgroundBlurStyle(this.glass ? Theme.glassBlur() : BlurStyle.NONE)
+    .backgroundBlurStyle(this.glass ? Theme.glassBlur(this.theme) : BlurStyle.NONE)
     .shadow(this.glass
       ? Theme.cardShadow(this.theme)
       : { radius: 0, color: Color.Transparent, offsetY: 0 })

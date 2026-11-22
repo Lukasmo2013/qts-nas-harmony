@@ -2,7 +2,7 @@
 
 用鸿蒙手机 / 平板管理你的威联通（QNAP）NAS：设备状态、文件、容器、自动备份，以及**开箱可用的 Tailscale 内网直连**。
 
-**作者 / 版权**：莫洁安（annst） · **许可**：MIT · **当前版本**：2.1.5
+**作者 / 版权**：莫洁安（annst） · **许可**：MIT · **当前版本**：2.1.6
 
 **仓库地址**：https://gitee.com/YOUR_GITEE_ACCOUNT/qts-nas-harmony
 **更新日志**：[CHANGELOG.md](./CHANGELOG.md)（2.1.5 起独立维护，含修复根因说明）
@@ -91,7 +91,7 @@ bash tools/push_gitee.sh qts-nas-harmony
 #    按提示输入 Gitee 用户名；密码 / 私人令牌由 git 自行提示
 ```
 
-Release 附件只上传 **unsigned HAP**：`dist/QnapNasManager-2.1.5-unsigned.hap`。
+Release 附件只上传 **unsigned HAP**：`dist/QnapNasManager-2.1.6-unsigned.hap`。
 **不要上传** `tools/signing/` 下的证书、keystore、profile 或任何 signed 产物。
 
 ---
@@ -426,7 +426,7 @@ peers: myiddrive → 100.x.x.x ; myidnas → 100.x.x.x ; …
 最终包：`dist/QnapNasManager-2.1.5-unsigned.hap`（unsigned），SHA-256
 `0e6aceb53c6687b2d80227925ec8443d2023235e0d88627a250465797400854d`。
 
-**后续版本号**：当前基线为 2.1.5，下一次从 2.1.6 递增，不再回到 1.2.x 序列。
+**后续版本号**：当前基线为 2.1.6，下一次从 2.1.7 递增，不再回到 1.2.x 序列。
 
 **真机诊断：直接读状态文件（最快，无需日志）**：
 
@@ -618,11 +618,13 @@ python tools/sign_release.py --verify-only  # 只复核现有 profile 与 signed
 
 ## 五、鸿蒙 7 设计：雾玻璃 + 左右滑动 + 大屏范式
 
-- **雾玻璃是唯一材质语言**：`CardContainer({ glass: true })`、悬浮底栏、侧栏 / 顶栏、各页对话框、自动备份配置层，
-  统一为「`BlurStyle.COMPONENT_THICK` 组分模糊 + 半透明底（明 `#FFFFFFCC` / 暗 `#191D24CC`）+ 1px 冷灰描边
-  （明 `#E3E9F2` / 暗 `#2F3541`）+ 大半径浅投影（`Theme.cardShadow`，明 r16 / 暗 r18）」。
-  玻璃层保持约 0.80 不透明度：既透出页面渐变形成纵深，又挡住系统壁纸 / 设备主题的**暖黄调**染色；
-  配合 `EntryAbility` 显式 `setWindowBackgroundColor('#F1F3F7')` 彻底阻断渗透。
+- **两套材质，按明暗分流**（2.1.6 起）：
+  - **浅色 = 纯白卡片**：`#FFFFFF` 实底 + 1px 冷灰描边 `#E6E8EC` + 大半径浅投影（`Theme.cardShadow`，r16），
+    **关闭背景模糊**。原因很硬：半透明 + 模糊会采样窗口背后的壁纸，暖色壁纸会把整块卡片染成浅黄，
+    0.80 透明度下尤其明显（2.1.5 真机反馈），纯白是唯一稳妥解，也最贴合「素雅、大气、精致」。
+  - **深色 = 雾玻璃**：`BlurStyle.COMPONENT_THICK` + 半透明底 `#191D24CC` + 描边 `#2F3541` + r18 投影，
+    避免纯黑死板，保留鸿蒙 7 的通透层次。
+  - 底栏 / 顶栏 / 侧栏在浅色下为近纯白（`#FFFFFFF5` / `#FFFFFF`），页底 `setWindowBackgroundColor('#F4F5F7')`。
   - 弹层遮罩统一走 `Theme.scrim()`（明 `#1B243480` / 暗 `#00000099`），不再散落写死 `#66000000`。
   - 可点击行 / 卡片按下时叠 `Theme.pressBg()`，保证「按下去有反馈」而不是一片沉默。
 - **系统强调色泄漏防护**：HarmonyOS `Button` 默认取系统强调色（可能是暖黄），因此所有 `Button` 一律 `ButtonType.Capsule` + 显式 `backgroundColor / fontColor`（`Theme.buttonPrimaryBg / buttonPrimaryFg / buttonGhostBg / buttonGhostFg / buttonDangerBg`）；`Toggle` 显式 `selectedColor` + `switchPointColor('#FFFFFF')`；`TextInput` 显式 `caretColor`。
@@ -635,7 +637,8 @@ python tools/sign_release.py --verify-only  # 只复核现有 profile 与 signed
   侧边栏与顶栏同步改为 `chromeBg`（`#FBFBFCD2` / `#171A1FC2`）+ 系统模糊 + 单边描边，全局只有一套雾玻璃语言。
 - **页面自身持有滚动**：`pagedContent()` 的 Swiper 子项**不再包 `Scroll()`**（此前 `Scroll(){ HomePage() }` 让页面 `height('100%')` 失去确定值，直接导致整页空白）；滚动下沉到各页自己的 `Scroll().layoutWeight(1)`，`PageHeader` 固定不动。
 
-- **冷调色板（默认，零暖黄）**：基底 `#F7F9FD → #E9EEF6` 三段式冷调渐变 + 白卡片 `#FFFFFF` + 1px 极淡描边 `#E6EAF1`；
+- **中性色板（默认，零暖黄、零蓝调）**：基底 `#F7F8FA → #EDEFF2` 中性灰阶 + 纯白卡片 `#FFFFFF` + 1px 极淡描边 `#E8EAED`；
+  内层区块（输入框 / 次级按钮 / 图标底）为中性浅灰 `#F7F8FA` / `#F2F3F5`，不带任何色相，避免整屏偏色；
   强调色为天青蓝 `#2E6AD6`（白底对比度 5.0:1，仅用于按钮 / 选中 / 链接等小面积），大面积图表用低饱和墨蓝 `#7E93B8`，
   成功 `#2E8B6B` / 注意态冷灰 `#6B7480` / 危险 `#C0524C` 均去饱和处理。深色模式同步一套
   （`#151920 → #0A0C10` 基底 / `#171A20` 卡片）。`Theme.ets` 为唯一样式来源，`preview/index.html` 的 CSS 变量与之逐一对应。
@@ -746,10 +749,10 @@ python tools/sign_release.py --verify-only  # 只复核现有 profile 与 signed
 | # | 项目 | 状态 | 说明 |
 | --- | --- | --- | --- |
 | 1 | Stage 模型 / ArkTS 静态类型 / 无 `any` / 无非空断言 | ✅ | 真实编译 + 静态校验 PASS |
-| 2 | `bundleName`、版本号、图标、应用名资源 | ✅ | `com.wlt.qnap.nasmanager` / `2.1.5` / `QTS NAS` / 48 图标 |
+| 2 | `bundleName`、版本号、图标、应用名资源 | ✅ | `com.wlt.qnap.nasmanager` / `2.1.6` / `QTS NAS` / 48 图标 |
 | 3 | 设备类型 `phone / tablet / 2in1`、多断点适配 | ✅ | 宽度驱动 sm / md / lg |
 | 4 | 权限最小化与申请原因 | ✅ | `INTERNET`、`GET_NETWORK_INFO`、`READ_IMAGEVIDEO` 三项 + `$string` 用途说明；未使用的 `KEEP_BACKGROUND_RUNNING` 已删除 |
-| 5 | 中英双语、深浅色 | ✅ | 628×2 文案键 |
+| 5 | 中英双语、深浅色 | ✅ | 629×2 文案键 |
 | 6 | release 构建 + 代码压缩 | ✅ | signed HAP |
 | 7 | `app_gallery` 类型 release profile | ✅ | `verify-profile` PASS |
 | 8 | HAP 签名 + 验签 | 本地自备 | 仓库只分发 unsigned；签名需自有 AGC 证书与 `QNAP_SIGN_PASSWORD` |

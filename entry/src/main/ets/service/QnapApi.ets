@@ -133,6 +133,85 @@ function cdataBlocks(xml: string, tag: string): string[] {
   return blocks;
 }
 
+/**
+ * 取 `<tag ...>值</tag>` 的全部文本值：兼容 CDATA、带属性与自闭合写法。
+ * 用于共享管理接口（XML）这类字段名随固件变化、不便逐层解析的响应。
+ */
+function tagValues(xml: string, tag: string): string[] {
+  const values: string[] = [];
+  const open = '<' + tag;
+  const close = '</' + tag + '>';
+  let from = 0;
+  for (;;) {
+    const i = xml.indexOf(open, from);
+    if (i < 0) {
+      break;
+    }
+    const gt = xml.indexOf('>', i);
+    if (gt < 0) {
+      break;
+    }
+    // 自闭合标签（<tag/>）没有值，跳过
+    if (xml.charAt(gt - 1) === '/') {
+      from = gt + 1;
+      continue;
+    }
+    let start = gt + 1;
+    const cdataOpen = '<![CDATA[';
+    if (xml.startsWith(cdataOpen, start)) {
+      start += cdataOpen.length;
+    }
+    const end = xml.indexOf(close, start);
+    if (end < 0) {
+      break;
+    }
+    let value = xml.substring(start, end);
+    const cdataEnd = value.indexOf(']]>');
+    if (cdataEnd >= 0) {
+      value = value.substring(0, cdataEnd);
+    }
+    values.push(value.trim());
+    from = end + close.length;
+  }
+  return values;
+}
+
+/** File Station 目录树 / 列表接口返回的单个节点。 */
+interface ShareNodeJson {
+  path?: string;
+  text?: string;
+  name?: string;
+  filename?: string;
+  isfolder?: number;
+}
+
+/** 上述接口的可能外层结构（不同固件字段名不同，全部兼容）。 */
+interface ShareTreeResponse {
+  status?: number;
+  datas?: ShareNodeJson[];
+  nodes?: ShareNodeJson[];
+  items?: ShareNodeJson[];
+  data?: ShareNodeJson[];
+}
+
+/** 从节点里取共享名：优先完整路径，其次显示名。 */
+function shareNodeName(node: ShareNodeJson): string {
+  if (node.path !== undefined && node.path.length > 0) {
+    return node.path.replace(/^\/+/, '');
+  }
+  if (node.text !== undefined && node.text.length > 0) {
+    return node.text.replace(/^\/+/, '');
+  }
+  if (node.name !== undefined) {
+    return node.name.replace(/^\/+/, '');
+  }
+  if (node.filename !== undefined) {
+    return node.filename.replace(/^\/+/, '');
+  }
+  return '';
+}
+
+
 /* ---------- File Station 6 列表响应的显式类型契约 ---------- */
 interface FileEntry {
   filename?: string;
@@ -1621,10 +1700,15 @@ export class QnapApi {
   /**
    * 共享目录列表（文件浏览的入口）。
    *
-   * 真实契约：GET /cgi-bin/priv/privRequest.cgi?subfunc=share&read=2&refresh=0
-   *   → <defShareList><![CDATA[Public/TMBackup]]></defShareList>（共享名以 / 分隔）
-   *   → <no_del_list><no_del_info><share_name>Container</share_name>（系统共享）
-   * 名单中可能包含尚未创建的共享（如 TMBackup），因此逐个用 get_list 探测后只保留真实存在的。
+   * 真机实测（重要）：`privRequest.cgi?subfunc=share&read=2` 只返回
+   *   → <defShareList> 默认共享（Public…）
+   *   → <no_del_list><no_del_info><share_name> 系统共享（Container…）
+   * **用户自建的共享（Data / Download / Multimedia…）根本不在这个响应里**，
+   * 所以只靠它就只能看到 Public / Container。真正的全量名单在 File Station
+   * 与共享管理接口里，这里按「多源合并」的方式枚举：
+   *   1) privRequest 的默认共享 + 系统共享（无需探测，直接采用）；
+   *   2) File Station 目录树 / 共享管理接口（本机全部共享，逐个 get_list 校验存在性）。
+   * 最后按名称排序，与主机 File Station 的展示顺序保持一致。
    */
   static async shares(): Promise<string[]> {
     if (QnapApi.shareCache.length > 0) {
@@ -1632,67 +1716,55 @@ export class QnapApi {
     }
     const url = QnapApi.baseUrl() + '/cgi-bin/priv/privRequest.cgi?subfunc=share&read=2&refresh=0';
     const candidates: string[] = [];
-    /** 设备在「共享清单」里明确列出的项：探测失败也保留，否则 Data 这类共享会被误过滤。 */
+    /** 设备在「共享清单」里明确列出的项：探测失败也保留，否则只读共享会被误过滤。 */
     const explicit: string[] = [];
     const body = await QnapApi.get(url);
-    if (body.length === 0) {
-      return [];
-    }
 
     const push = (list: string[], raw: string): void => {
       const name: string = raw.trim().replace(/^\/+/, '');
-      if (name.length > 0 && list.indexOf(name) < 0) {
+      if (QnapApi.looksLikeShareName(name) && list.indexOf(name) < 0) {
         list.push(name);
       }
     };
 
-    // 1) 默认共享清单（可能包含尚未创建的目录，如 TMBackup）
-    //    不同固件的分隔符可能是 / 或 ;，统一归一化后再拆，避免把「A;B」当成一个共享名。
-    const defList = cdata(body, 'defShareList');
-    if (defList.length > 0) {
-      const normalized: string = defList.replace(/;/g, '/').replace(/\|/g, '/');
-      const parts = normalized.split('/');
-      for (const part of parts) {
-        push(candidates, part);
-      }
-    }
-
-    // 2) 系统共享（Public / Container 等）
-    const sysBlocks = cdataBlocks(body, 'no_del_info');
-    for (const block of sysBlocks) {
-      const name = cdata(block, 'share_name');
-      push(candidates, name);
-      push(explicit, name);
-    }
-
-    // 3) 普通共享：share_list / share_info（旧实现漏解析，导致只显示前两个系统共享）
-    const listTags: string[] = ['share_info', 'share'];
-    for (const tag of listTags) {
-      const blocks = cdataBlocks(body, tag);
-      for (const block of blocks) {
-        let name = cdata(block, 'share_name');
-        if (name.length === 0) {
-          name = cdata(block, 'shareName');
+    if (body.length > 0) {
+      // 1) 默认共享清单；不同固件分隔符可能是 / 或 ; 或 |，归一化后再拆。
+      const defList = cdata(body, 'defShareList');
+      if (defList.length > 0) {
+        const normalized: string = defList.replace(/;/g, '/').replace(/\|/g, '/');
+        for (const part of normalized.split('/')) {
+          push(candidates, part);
         }
+      }
+      // 2) 系统共享（Public / Container 等）
+      for (const block of cdataBlocks(body, 'no_del_info')) {
+        const name = cdata(block, 'share_name');
         push(candidates, name);
         push(explicit, name);
       }
-    }
-
-    // 4) 部分固件直接平铺 <share_name> / <shareName>
-    const flatTags: string[] = ['share_name', 'shareName'];
-    for (const tag of flatTags) {
-      const blocks = cdataBlocks(body, tag);
-      for (const block of blocks) {
-        const name = cdata(block, tag);
-        push(candidates, name);
-        push(explicit, name);
+      // 3) 部分固件把普通共享也塞进了同一响应
+      const listTags: string[] = ['share_info', 'share'];
+      for (const tag of listTags) {
+        for (const block of cdataBlocks(body, tag)) {
+          let name = cdata(block, 'share_name');
+          if (name.length === 0) {
+            name = cdata(block, 'shareName');
+          }
+          push(candidates, name);
+          push(explicit, name);
+        }
       }
     }
 
+    // 4) 真正的全量共享：File Station / 共享管理接口
+    const enumerated: string[] = await QnapApi.enumerateShares();
+    for (const name of enumerated) {
+      push(candidates, name);
+    }
+
+    // 5) 校验：清单内明确存在的直接采用；枚举出来的逐个确认可列举，过滤掉误解析的字段。
     const valid: string[] = [];
     for (const name of candidates) {
-      // 清单里明确存在的共享直接采用，避免逐个 get_list 探测既慢又误杀只读共享。
       if (explicit.indexOf(name) >= 0) {
         valid.push('/' + name);
         continue;
@@ -1702,8 +1774,102 @@ export class QnapApi {
         valid.push('/' + name);
       }
     }
-    QnapApi.shareCache = valid;
+    // 6) 名称排序：与主机 File Station 的字母序一致，避免「先后顺序看起来不齐」。
+    valid.sort((a: string, b: string) => a.toLowerCase() < b.toLowerCase() ? -1 :
+      (a.toLowerCase() > b.toLowerCase() ? 1 : 0));
+    if (valid.length > 0) {
+      QnapApi.shareCache = valid;
+    }
     return valid;
+  }
+
+  /** 共享名合法性：排除解析出来的标签名、路径、空白与明显非法字符。 */
+  private static looksLikeShareName(name: string): boolean {
+    if (name.length === 0 || name.length > 96) {
+      return false;
+    }
+    if (name.indexOf('/') >= 0 || name.indexOf('<') >= 0 || name.indexOf('>') >= 0 ||
+      name.indexOf('{') >= 0 || name.indexOf('"') >= 0) {
+      return false;
+    }
+    const reserved: string[] = ['share_name', 'shareName', 'name', 'volume', 'volume_name',
+      'true', 'false', 'null', 'undefined'];
+    return reserved.indexOf(name) < 0;
+  }
+
+  /**
+   * 枚举主机上的**全部**共享目录。
+   * 按「File Station 目录树 → File Station 5 → 共享管理接口」的顺序尝试，
+   * 谁先返回可用结果就用谁；全部失败时返回空数组（调用方仍保留 privRequest 的结果）。
+   */
+  private static async enumerateShares(): Promise<string[]> {
+    const paths: string[] = [
+      '/FileStation6/utilRequest.cgi?func=get_tree&node=/&is_iso=0&media=2',
+      '/cgi-bin/filemanager/utilRequest.cgi?func=get_tree&node=/&is_iso=0',
+      '/cgi-bin/management/manaRequest.cgi?subfunc=get_share_list',
+      '/cgi-bin/management/manaRequest.cgi?subfunc=get_share&read=1'
+    ];
+    for (const path of paths) {
+      const body = await QnapApi.get(QnapApi.baseUrl() + path, true, 8000);
+      if (body.length === 0) {
+        continue;
+      }
+      const names: string[] = QnapApi.shareNamesFrom(body);
+      if (names.length > 0) {
+        // 上限保护：异常响应（例如被弹回门户 HTML）不应引发成百上千次探测。
+        return names.length > 32 ? names.slice(0, 32) : names;
+      }
+    }
+    return [];
+  }
+
+  /** 从 JSON / XML 响应里提取共享名（两种格式都做，避免依赖单一固件格式）。 */
+  private static shareNamesFrom(body: string): string[] {
+    const names: string[] = [];
+    const trimmed: string = body.trim();
+    // 被中继 / 网关弹回 HTML 时直接放弃，避免从页面标签里解析出假共享名。
+    if (trimmed.toLowerCase().indexOf('<html') >= 0) {
+      return names;
+    }
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed) as ShareTreeResponse;
+        const lists: ShareNodeJson[][] = [];
+        if (parsed.datas !== undefined) {
+          lists.push(parsed.datas);
+        }
+        if (parsed.nodes !== undefined) {
+          lists.push(parsed.nodes);
+        }
+        if (parsed.items !== undefined) {
+          lists.push(parsed.items);
+        }
+        if (parsed.data !== undefined) {
+          lists.push(parsed.data);
+        }
+        for (const list of lists) {
+          for (const node of list) {
+            const raw: string = shareNodeName(node);
+            if (QnapApi.looksLikeShareName(raw) && names.indexOf(raw) < 0) {
+              names.push(raw);
+            }
+          }
+        }
+      } catch (e) {
+        return [];
+      }
+      return names;
+    }
+    const tags: string[] = ['share_name', 'shareName', 'share', 'name'];
+    for (const tag of tags) {
+      for (const value of tagValues(body, tag)) {
+        const raw: string = value.trim().replace(/^\/+/, '');
+        if (QnapApi.looksLikeShareName(raw) && names.indexOf(raw) < 0) {
+          names.push(raw);
+        }
+      }
+    }
+    return names;
   }
 
   /** 可写共享目录缓存（用「建临时目录再删掉」探测，建成功即代表该共享可写）。 */
