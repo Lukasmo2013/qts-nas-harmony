@@ -1,0 +1,10 @@
+{
+  "modelVersion": "5.0.0",
+  "name": "qnap-nas-manager",
+  "version": "1.1.0",
+  "description": "HarmonyOS native application for QTS NAS device management",
+  "main": "",
+  "author": "wlt",
+  "license": "Apache-2.0",
+  "dependencies": {}
+}

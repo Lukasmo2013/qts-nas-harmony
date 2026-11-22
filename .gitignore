@@ -1,0 +1,38 @@
+# ===== 构建产物（不入库） =====
+/build/
+/entry/build/
+/.hvigor/
+/oh_modules/
+/entry/oh_modules/
+/entry/.preview/
+/.idea/
+*.log
+*.hap
+*.app
+
+# ===== 签名材料与任何凭据（严禁入库） =====
+/tools/signing/
+*.p12
+*.cer
+*.p7b
+*.csr
+*.keystore
+*.jks
+*.env
+.env*
+local.properties
+build-profile.selfsigned.json5.bak
+build-profile.ide-current.json5
+
+# ===== 本地工作区数据 =====
+/.workbuddy/
+/preview/node_modules/
+# 开发期截图可能含真实设备信息，不随仓库分发
+/preview/_shots/
+__pycache__/
+*.pyc
+
+# ===== 系统文件 =====
+.DS_Store
+Thumbs.db
+desktop.ini

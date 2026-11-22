@@ -1,0 +1,10 @@
+{
+  "string": [
+    { "name": "app_name", "value": "QTS NAS" },
+    { "name": "module_desc", "value": "Main module for QTS NAS device management" },
+    { "name": "ability_desc", "value": "Device connection, overview, files, storage and containers" },
+    { "name": "permission_internet_reason", "value": "Required to reach the NAS device on the local network and read its status" },
+    { "name": "permission_network_reason", "value": "Required to detect network state and show a clear message when the connection fails" },
+    { "name": "permission_media_reason", "value": "Used only when you enable photo backup, to keep original file names on the NAS. Other media is never scanned or uploaded." }
+  ]
+}

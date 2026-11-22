@@ -1,0 +1,10 @@
+{
+  "string": [
+    { "name": "app_name", "value": "QTS NAS" },
+    { "name": "module_desc", "value": "QTS NAS 设备管理主模块" },
+    { "name": "ability_desc", "value": "设备连接、状态概览、文件、存储与容器管理" },
+    { "name": "permission_internet_reason", "value": "用于连接同一局域网内的 NAS 设备并获取设备状态" },
+    { "name": "permission_network_reason", "value": "用于检测网络状态，在连接异常时给出提示" },
+    { "name": "permission_media_reason", "value": "仅在您选择自动备份照片时读取所选文件的原始名称，用于在 NAS 上保留文件名；不会扫描或上传其他媒体内容" }
+  ]
+}

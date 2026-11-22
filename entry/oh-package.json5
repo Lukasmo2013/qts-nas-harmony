@@ -1,0 +1,9 @@
+{
+  "name": "entry",
+  "version": "1.1.0",
+  "description": "QTS NAS main module",
+  "main": "",
+  "author": "wlt",
+  "license": "Apache-2.0",
+  "dependencies": {}
+}

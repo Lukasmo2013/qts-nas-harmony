@@ -1,0 +1,14 @@
+{
+  "color": [
+    { "name": "start_window_background", "value": "#F4F5F6" },
+    { "name": "primary", "value": "#3D74C4" },
+    { "name": "page_background", "value": "#F4F5F6" },
+    { "name": "card_background", "value": "#FFFFFF" },
+    { "name": "text_primary", "value": "#25282E" },
+    { "name": "text_secondary", "value": "#8A8F98" },
+    { "name": "divider", "value": "#E7E9EC" },
+    { "name": "success", "value": "#4E8C74" },
+    { "name": "warning", "value": "#6E7681" },
+    { "name": "danger", "value": "#B5615C" }
+  ]
+}
