@@ -1,31 +1,35 @@
 import { AppConstants } from './AppConstants';
 
 /**
- * HarmonyOS 7 素雅色板（Elegant / Quiet Design Tokens）。
+ * HarmonyOS 7 雾玻璃设计令牌（Frosted Glass Design Tokens）。
  *
  * 设计原则：
- * 1. 基底走中性灰白而非蓝调，避免大面积冷色发闷发脏；
- * 2. 强调色取克制的钢蓝 #3D74C4，只用于按钮 / 选中 / 链接等小面积；
- * 3. 卡片以「框」的形式呈现：近白半透明底 + 1px 极淡灰描边 + 极轻投影；
- * 4. 雾玻璃底不透明度提高到 ~95%，避免系统壁纸 / 设备主题色（常见为暖黄）
- *    透过模糊层给整页染上暖色；
- * 5. 明暗两套语义色，页面只消费语义色，不写死具体色值；
- * 6. 语义色中不含任何暖黄色相：warning 一律走冷灰蓝，保证整体克制统一。
+ * 1. 基底走「冷调中性灰蓝」，比纯灰多一点空气感，避免大面积发闷发脏；
+ * 2. 强调色取清晰的天青蓝 #2E6AD6，白底对比度 5.0:1（满足正文 AA），
+ *    只用于按钮 / 选中 / 链接等小面积，不做大面积铺色；
+ * 3. 卡片是「悬浮的雾玻璃片」：半透明底 + 系统组分模糊 + 1px 高光描边 + 层叠投影，
+ *    透过模糊层能看到页面柔和的渐变底，形成纵深而不是一整块死白；
+ * 4. 明暗两套语义色，页面只消费语义色，不写死具体色值；
+ * 5. 语义色中不含任何暖黄色相：warning 一律走冷灰蓝，保证整体克制统一；
+ * 6. 玻璃层不透明度保持在 0.72 ~ 0.85 区间：既能透出底部渐变形成通透感，
+ *    又能阻断系统壁纸 / 设备主题色（常见为暖黄）给整页染色。
  */
 export class Theme {
-  /** 克制的钢蓝强调色：明暗两套下均保持可读对比度，仅用于可交互元素。 */
-  static readonly PRIMARY: string = '#3D74C4';
-  static readonly PRIMARY_SOFT: string = '#EDF2F8';
+  /** 主强调色：天青蓝。用于按钮、选中态、链接、关键图标。 */
+  static readonly PRIMARY: string = '#2E6AD6';
+  /** 主强调色的深色端，仅用于渐变与按压态。 */
+  static readonly PRIMARY_DEEP: string = '#1F52B0';
+  static readonly PRIMARY_SOFT: string = '#E7EFFC';
   /** 大面积低饱和墨蓝：用于图表、指标条，避免紫/橙/青多色并置。 */
-  static readonly INK_BLUE: string = '#7D93B8';
-  static readonly INK_BLUE_SOFT: string = '#EFF2F7';
-  static readonly SUCCESS: string = '#4E8C74';
-  static readonly SUCCESS_SOFT: string = '#EBF3EF';
-  /** 注意态：冷灰蓝，不使用暖黄，避免与「素雅」基调冲突。 */
-  static readonly WARNING: string = '#6E7681';
-  static readonly WARNING_SOFT: string = '#F1F2F4';
-  static readonly DANGER: string = '#B5615C';
-  static readonly DANGER_SOFT: string = '#F8EDEC';
+  static readonly INK_BLUE: string = '#7E93B8';
+  static readonly INK_BLUE_SOFT: string = '#EEF2F9';
+  static readonly SUCCESS: string = '#2E8B6B';
+  static readonly SUCCESS_SOFT: string = '#E8F5EF';
+  /** 注意态：冷灰蓝，不使用暖黄，避免与素雅基调冲突。 */
+  static readonly WARNING: string = '#6B7480';
+  static readonly WARNING_SOFT: string = '#F0F2F6';
+  static readonly DANGER: string = '#C0524C';
+  static readonly DANGER_SOFT: string = '#FBEDEC';
   static readonly PURPLE: string = '#7B61FF';
   static readonly CYAN: string = '#00A9C8';
 
@@ -45,53 +49,55 @@ export class Theme {
     return Theme.effective(setting) === 'dark';
   }
 
-  /** 页面底色：中性灰，比纯白更安静，衬出白色卡片。 */
+  /* ---------- 基底 ---------- */
+
+  /** 页面底色：冷调浅灰蓝，衬出悬浮的玻璃卡片。 */
   static pageBg(setting: string): string {
-    return Theme.isDark(setting) ? '#14161A' : '#F4F5F6';
+    return Theme.isDark(setting) ? '#0D0F13' : '#F1F3F7';
   }
 
   static cardBg(setting: string): string {
-    return Theme.isDark(setting) ? '#1B1E23' : '#FFFFFF';
+    return Theme.isDark(setting) ? '#171A20' : '#FFFFFF';
   }
 
   /** 次级容器：输入框、内嵌块、选中行。 */
   static subCardBg(setting: string): string {
-    return Theme.isDark(setting) ? '#23262C' : '#F1F2F4';
+    return Theme.isDark(setting) ? '#22262E' : '#F2F5F9';
   }
 
   /** 导航 / 顶栏：与页面底色拉开一档，但不使用纯白刺眼。 */
   static navBg(setting: string): string {
-    return Theme.isDark(setting) ? '#17191D' : '#FAFAFB';
+    return Theme.isDark(setting) ? '#12151A' : '#FAFBFD';
   }
 
   /** 1px 极淡描边，替代重阴影。 */
   static hairline(setting: string): string {
-    return Theme.isDark(setting) ? '#282C33' : '#E7E9EC';
+    return Theme.isDark(setting) ? '#262B34' : '#E6EAF1';
   }
 
-  /** 图标底：中性灰，取代原来的高饱和彩色圆形。 */
+  /** 图标底：低饱和冷灰，取代高饱和彩色圆形。 */
   static quietIconBg(setting: string): string {
-    return Theme.isDark(setting) ? '#242830' : '#F0F1F3';
+    return Theme.isDark(setting) ? '#232833' : '#EEF2F8';
   }
 
   static textPrimary(setting: string): string {
-    return Theme.isDark(setting) ? '#E9EBEE' : '#25282E';
+    return Theme.isDark(setting) ? '#EAEDF2' : '#1D2129';
   }
 
   static textSecondary(setting: string): string {
-    return Theme.isDark(setting) ? '#949AA4' : '#8A8F98';
+    return Theme.isDark(setting) ? '#98A0AD' : '#7B8494';
   }
 
   static divider(setting: string): string {
-    return Theme.isDark(setting) ? '#282C33' : '#ECEEF0';
+    return Theme.isDark(setting) ? '#23272F' : '#EBEFF5';
   }
 
   static iconTint(setting: string): string {
-    return Theme.isDark(setting) ? '#A7ADB6' : '#6F757E';
+    return Theme.isDark(setting) ? '#A9B1BD' : '#68707E';
   }
 
   static primarySoft(setting: string): string {
-    return Theme.isDark(setting) ? '#20304F' : Theme.PRIMARY_SOFT;
+    return Theme.isDark(setting) ? '#1D2C46' : Theme.PRIMARY_SOFT;
   }
 
   static inkBlueSoft(setting: string): string {
@@ -99,16 +105,28 @@ export class Theme {
   }
 
   static successSoft(setting: string): string {
-    return Theme.isDark(setting) ? '#20362D' : Theme.SUCCESS_SOFT;
+    return Theme.isDark(setting) ? '#1C3129' : Theme.SUCCESS_SOFT;
   }
 
   static warningSoft(setting: string): string {
-    return Theme.isDark(setting) ? '#262A31' : Theme.WARNING_SOFT;
+    return Theme.isDark(setting) ? '#242830' : Theme.WARNING_SOFT;
   }
 
   static dangerSoft(setting: string): string {
-    return Theme.isDark(setting) ? '#382624' : Theme.DANGER_SOFT;
+    return Theme.isDark(setting) ? '#3A2523' : Theme.DANGER_SOFT;
   }
+
+  /** 按压反馈底色：任何可点击行 / 卡片按下时统一使用，保证「点了有反应」。 */
+  static pressBg(setting: string): string {
+    return Theme.isDark(setting) ? '#2A2F3A' : '#E8EEF8';
+  }
+
+  /** 弹层遮罩：比纯黑 40% 更柔和，且随主题深浅变化。 */
+  static scrim(setting: string): string {
+    return Theme.isDark(setting) ? '#00000099' : '#1B243480';
+  }
+
+  /* ---------- 状态标签 ---------- */
 
   /** 状态标签语义色：success / warning / danger / info */
   static tagForeground(tone: string): string {
@@ -139,9 +157,9 @@ export class Theme {
 
   /* ---------- 按钮语义色 ----------
    * HarmonyOS 的 Button 默认使用「系统强调色」（随设备主题变化，可能是暖黄）。
-   * 页面内所有按钮一律显式指定下列颜色，保证与素雅色板一致。 */
+   * 页面内所有按钮一律显式指定下列颜色，保证与设计令牌一致。 */
   static buttonPrimaryBg(setting: string): string {
-    return Theme.isDark(setting) ? '#4A83D1' : Theme.PRIMARY;
+    return Theme.isDark(setting) ? '#3D7AE0' : Theme.PRIMARY;
   }
 
   static buttonPrimaryFg(setting: string): string {
@@ -161,60 +179,104 @@ export class Theme {
     return Theme.DANGER;
   }
 
-  /* ---------- 雾玻璃「框」 ----------
-   * 底色近乎不透明（~95%），系统模糊只保留轻微通透感；
-   * 描边改为可见的极淡灰，使卡片真正呈现为「一个框」而不是一整块白。 */
+  /**
+   * 强调型「浅底按钮」：浅蓝底 + 蓝字。
+   * 这是本轮修复白字浅底（#FFFFFF on #EDF2F8）不可见的统一替代方案：
+   * 文字与底色同色系，对比度 ≥ 4.5:1，浅色与深色模式下都清晰可读。
+   */
+  static buttonSoftBg(setting: string): string {
+    return Theme.primarySoft(setting);
+  }
+
+  static buttonSoftFg(setting: string): string {
+    return Theme.isDark(setting) ? '#8FB4F2' : Theme.PRIMARY_DEEP;
+  }
+
+  static buttonSoftBorder(setting: string): string {
+    return Theme.isDark(setting) ? '#2C4470' : '#CBDDF8';
+  }
+
+  /* ---------- 雾玻璃「片」 ----------
+   * 底色半透明（明 0.80 / 暗 0.80），叠系统组分模糊；
+   * 描边为一圈极淡冷灰，把卡片框成一片「玻璃」而不是一整块白。 */
   static glassBg(setting: string): string {
-    return Theme.isDark(setting) ? '#1E222AD9' : '#FFFFFFF2';
+    return Theme.isDark(setting) ? '#191D24CC' : '#FFFFFFCC';
   }
 
   static glassBorder(setting: string): string {
-    return Theme.isDark(setting) ? '#2E333B' : '#E2E6EB';
+    return Theme.isDark(setting) ? '#2F3541' : '#E3E9F2';
+  }
+
+  /** 玻璃片顶缘高光：叠在 1px 描边上，模拟光线掠过玻璃边缘。 */
+  static glassHighlight(setting: string): string {
+    return Theme.isDark(setting) ? '#FFFFFF14' : '#FFFFFFB0';
   }
 
   static glassShadow(setting: string): string {
-    return Theme.isDark(setting) ? 'rgba(0,0,0,0.22)' : 'rgba(31,38,51,0.05)';
+    return Theme.isDark(setting) ? 'rgba(0,0,0,0.36)' : 'rgba(20,32,58,0.10)';
   }
 
-  /** 页面柔和渐变底：玻璃框模糊它后方，呈现通透大气的观感。
+  /** 卡片投影：玻璃片用大半径浅投影制造「漂浮」感。 */
+  static cardShadow(setting: string): ShadowOptions {
+    return {
+      radius: Theme.isDark(setting) ? 18 : 16,
+      color: Theme.glassShadow(setting),
+      offsetX: 0,
+      offsetY: Theme.isDark(setting) ? 6 : 5
+    };
+  }
+
+  /** 卡片 / 底栏使用的模糊档位：COMPONENT_THICK 是鸿蒙 7 雾玻璃的推荐强度。 */
+  static glassBlur(): BlurStyle {
+    return BlurStyle.COMPONENT_THICK;
+  }
+
+  /** 页面柔和渐变底：玻璃片模糊它后方，呈现通透的纵深。
    *  linearGradient 要求 colors 为 [ResourceColor, number][]（颜色 + 位置）元组数组。 */
   static pageGradientColors(setting: string): [string, number][] {
     return Theme.isDark(setting)
-      ? [['#16181C', 0.0], ['#0F1114', 1.0]]
-      : [['#F4F5F6', 0.0], ['#FAFAFB', 1.0]];
+      ? [['#151920', 0.0], ['#10131A', 0.45], ['#0A0C10', 1.0]]
+      : [['#F7F9FD', 0.0], ['#EFF3F9', 0.5], ['#E9EEF6', 1.0]];
+  }
+
+  /** 顶部主视觉渐晕：给页面首屏一点色相层次，不做大面积着色。 */
+  static heroGradientColors(setting: string): [string, number][] {
+    return Theme.isDark(setting)
+      ? [['#1B3358', 0.0], ['#141922', 0.6], ['#00000000', 1.0]]
+      : [['#DCE8FB', 0.0], ['#EDF3FC', 0.55], ['#00000000', 1.0]];
   }
 
   /* ---------- 悬浮雾玻璃底栏 ----------
-   * 底栏是一条独立悬浮的圆角长条：比卡片更通透一点（让渐变色隐约透过），
-   * 但依然用高不透明度底色阻断壁纸 / 系统主题色的染色，
+   * 底栏是一条独立悬浮的圆角长条：比卡片更通透（让渐变隐约透过），
+   * 但依然用半透明底阻断壁纸 / 系统主题色染色，
    * 并依靠一层可见淡描边 + 柔和投影把它从页面内容上「抬起来」。 */
   static readonly BAR_HEIGHT: number = 62;
   static readonly BAR_RADIUS: number = 26;
 
   static barBg(setting: string): string {
-    return Theme.isDark(setting) ? '#1E222AC4' : '#FFFFFFD6';
+    return Theme.isDark(setting) ? '#1B1F27D9' : '#FFFFFFCC';
   }
 
   static barBorder(setting: string): string {
-    return Theme.isDark(setting) ? '#343A44' : '#DFE3E9';
+    return Theme.isDark(setting) ? '#333A45' : '#E1E7F0';
   }
 
   /** 底栏投影比卡片更明显，才能形成「悬浮」的层次。 */
   static barShadow(setting: string): string {
-    return Theme.isDark(setting) ? 'rgba(0,0,0,0.45)' : 'rgba(31,38,51,0.13)';
+    return Theme.isDark(setting) ? 'rgba(0,0,0,0.52)' : 'rgba(20,32,58,0.16)';
   }
 
   /** 底栏选中项的高亮胶囊底色。 */
   static barActiveBg(setting: string): string {
-    return Theme.isDark(setting) ? '#26344D' : '#EAF0F8';
+    return Theme.isDark(setting) ? '#22304A' : '#E7EFFC';
   }
 
   /** 顶栏 / 侧栏的雾玻璃底（比卡片更淡，保证大面积下不过白）。 */
   static chromeBg(setting: string): string {
-    return Theme.isDark(setting) ? '#171A1FC2' : '#FBFBFCD2';
+    return Theme.isDark(setting) ? '#12151AD9' : '#FBFCFEE0';
   }
 
   static chromeBorder(setting: string): string {
-    return Theme.isDark(setting) ? '#2A2F37' : '#E6E9ED';
+    return Theme.isDark(setting) ? '#282D36' : '#E6EAF1';
   }
 }

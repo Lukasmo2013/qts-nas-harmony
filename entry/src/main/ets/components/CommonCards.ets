@@ -104,9 +104,10 @@ export struct CardContainer {
     .margin({ bottom: BreakpointSystem.contentGap(this.bp) })
     .backgroundColor(this.glass ? Theme.glassBg(this.theme) : Theme.cardBg(this.theme))
     .border({ width: 1, color: this.glass ? Theme.glassBorder(this.theme) : Theme.hairline(this.theme) })
-    .backgroundBlurStyle(this.glass ? BlurStyle.Regular : BlurStyle.NONE)
+    // 鸿蒙 7 雾玻璃：组分模糊 + 半透明底 + 1px 冷灰描边 + 大半径浅投影。
+    .backgroundBlurStyle(this.glass ? Theme.glassBlur() : BlurStyle.NONE)
     .shadow(this.glass
-      ? { radius: 14, color: Theme.glassShadow(this.theme), offsetY: 4 }
+      ? Theme.cardShadow(this.theme)
       : { radius: 0, color: Color.Transparent, offsetY: 0 })
   }
 }
@@ -226,9 +227,10 @@ export struct MetricTile {
     .alignItems(HorizontalAlign.Start)
     .backgroundColor(this.glass ? Theme.glassBg(this.theme) : Theme.cardBg(this.theme))
     .border({ width: 1, color: this.glass ? Theme.glassBorder(this.theme) : Theme.hairline(this.theme) })
-    .backgroundBlurStyle(this.glass ? BlurStyle.Regular : BlurStyle.NONE)
+    // 鸿蒙 7 雾玻璃：组分模糊 + 半透明底 + 1px 冷灰描边 + 大半径浅投影。
+    .backgroundBlurStyle(this.glass ? Theme.glassBlur() : BlurStyle.NONE)
     .shadow(this.glass
-      ? { radius: 14, color: Theme.glassShadow(this.theme), offsetY: 4 }
+      ? Theme.cardShadow(this.theme)
       : { radius: 0, color: Color.Transparent, offsetY: 0 })
   }
 }
@@ -359,7 +361,9 @@ export struct ToastBar {
       .width('100%')
       .padding({ left: 14, right: 14, top: 12, bottom: 12 })
       .backgroundColor('#2A3038')
-      .borderRadius(12)
+      .borderRadius(14)
+      .shadow({ radius: 12, color: 'rgba(20,32,58,0.18)', offsetY: 4 })
+      .margin({ bottom: 2 })
       .alignItems(VerticalAlign.Center)
     }
   }

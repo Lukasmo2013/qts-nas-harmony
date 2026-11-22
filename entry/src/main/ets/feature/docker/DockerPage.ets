@@ -694,8 +694,11 @@ export struct DockerPage {
     }
     .width('100%')
     .padding(20)
-    .backgroundColor(Theme.cardBg(this.theme))
-    .borderRadius(18)
+    .backgroundColor(Theme.glassBg(this.theme))
+    .backgroundBlurStyle(Theme.glassBlur())
+    .border({ width: 1, color: Theme.glassBorder(this.theme) })
+    .borderRadius(20)
+    .shadow(Theme.cardShadow(this.theme))
     .alignItems(HorizontalAlign.Start)
   }
 

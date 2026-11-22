@@ -1034,7 +1034,7 @@ export struct LoginPage {
     }
     .padding({ left: 12, right: 12, top: 8, bottom: 8 })
     .backgroundColor(Theme.glassBg(this.theme))
-    .backgroundBlurStyle(BlurStyle.Regular)
+    .backgroundBlurStyle(Theme.glassBlur())
     .border({ width: 1, color: Theme.glassBorder(this.theme) })
     .borderRadius(18)
     .onClick(() => {
@@ -1454,7 +1454,7 @@ export struct LoginPage {
     .width('100%')
     .padding(22)
     .backgroundColor(Theme.glassBg(this.theme))
-    .backgroundBlurStyle(BlurStyle.Regular)
+    .backgroundBlurStyle(Theme.glassBlur())
     .border({ width: 1, color: Theme.glassBorder(this.theme) })
     .borderRadius(20)
     .shadow({ radius: 20, color: Theme.glassShadow(this.theme), offsetY: 6 })

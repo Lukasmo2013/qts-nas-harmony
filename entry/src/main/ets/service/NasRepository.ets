@@ -88,6 +88,11 @@ export class NasRepository {
     return await QnapApi.shares();
   }
 
+  /** 清空共享 / 可写缓存：下拉刷新与重新进页时调用，保证新增共享能立刻出现。 */
+  static resetShareCache(): void {
+    QnapApi.resetShareCache();
+  }
+
   /** 可写共享目录（探测得到，已缓存）：用于挑选默认落地目录与上传前提示。 */
   static async writableRoots(): Promise<string[]> {
     if (DemoMode.isActive()) {

@@ -137,7 +137,7 @@ export struct HomePage {
     CardContainer({ glass: true }) {
       Row() {
         Stack() {
-          Circle().width(46).height(46).fill(Theme.quietIconBg(this.theme))
+          Circle().width(46).height(46).fill(Theme.tagBackground(this.healthTone(), this.theme))
           Image($r('app.media.ic_shield'))
             .width(23)
             .height(23)
@@ -260,8 +260,8 @@ export struct HomePage {
           CardContainer({ glass: true }) {
             Column() {
               Stack() {
-                Circle().width(38).height(38).fill(Theme.quietIconBg(this.theme))
-                Image(item.icon).width(19).height(19).fillColor(Theme.iconTint(this.theme))
+                Circle().width(38).height(38).fill(Theme.primarySoft(this.theme))
+                Image(item.icon).width(19).height(19).fillColor(Theme.PRIMARY)
               }
               .width(38)
               .height(38)

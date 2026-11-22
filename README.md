@@ -2,13 +2,14 @@
 
 用鸿蒙手机 / 平板管理你的威联通（QNAP）NAS：设备状态、文件、容器、自动备份，以及**开箱可用的 Tailscale 内网直连**。
 
-**作者 / 版权**：莫洁安（annst） · **许可**：MIT · **当前版本**：2.1.4
+**作者 / 版权**：莫洁安（annst） · **许可**：MIT · **当前版本**：2.1.5
 
 **仓库地址**：https://gitee.com/YOUR_GITEE_ACCOUNT/qts-nas-harmony
+**更新日志**：[CHANGELOG.md](./CHANGELOG.md)（2.1.5 起独立维护，含修复根因说明）
 
 > 应用显示名统一为 **QTS NAS**（系统级应用名走 `app_name` 资源，应用内标题走 `app.name` 文案键）。
 > 包名 `com.wlt.qnap.nasmanager`。
-> **配色基调：素雅中性灰 + 克制钢蓝，界面零暖黄。**
+> **配色基调：冷调中性灰蓝 + 天青蓝主色（#2E6AD6），鸿蒙 7 雾玻璃质感，界面零暖黄。**
 > 本仓库**只提供 unsigned HAP**；签名证书、keystore、口令与 signed 产物一律不入库。
 
 ---
@@ -90,7 +91,7 @@ bash tools/push_gitee.sh qts-nas-harmony
 #    按提示输入 Gitee 用户名；密码 / 私人令牌由 git 自行提示
 ```
 
-Release 附件只上传 **unsigned HAP**：`dist/QnapNasManager-2.1.4-unsigned.hap`。
+Release 附件只上传 **unsigned HAP**：`dist/QnapNasManager-2.1.5-unsigned.hap`。
 **不要上传** `tools/signing/` 下的证书、keystore、profile 或任何 signed 产物。
 
 ---
@@ -396,7 +397,36 @@ peers: myiddrive → 100.x.x.x ; myidnas → 100.x.x.x ; …
 最终包：`dist/QnapNasManager-2.1.4-unsigned.hap`（unsigned），SHA-256
 `ee6c182ad2852f76774a66fc4bb5c6bee79bdb25d288d030746b572d61f689f8`。
 
-**后续版本号**：当前基线为 2.1.4，下一次从 2.1.5 递增，不再回到 1.2.x 序列。
+### 2.1.5 动态共享目录 · 自动备份交互 · 雾玻璃升级
+
+- **共享目录按主机实际情况动态展示**：`QnapApi.shares()` 现在同时解析 `defShareList`、系统共享
+  `no_del_info`、普通共享 `share_info / share`，以及部分固件平铺的 `share_name`；`defShareList` 兼容
+  `/`、`;`、`|` 三种分隔符（此前只按 `/` 拆分，非该分隔符的固件会把多个共享并成一个名字丢掉）。
+  清单中明确存在的共享**不再逐个 `get_list` 探测**——旧逻辑既慢，又会把只读共享误判为不存在，
+  这正是「只看到 Public / Container，看不到 Data」的根因。
+- **共享名单实时刷新**：文件页下拉刷新、设置页打开 NAS 目录选择器时都会 `resetShareCache()` 重新取名单，
+  在 NAS 上新建立共享后无需重启 App。
+- **自动备份开关显式化**：原来的「开启 / 关闭」是**白字 `#FFFFFF` 配浅蓝底 `#EDF2F8`**（对比度接近 1:1，
+  等于隐形，这是「开关不明显」的直接原因）。现改为 46×26 的 `Toggle` 开关控件，开为主色、关为浅灰轨道；
+  开启态整块面板转为浅蓝底 + 蓝边，状态一眼可见。
+- **点击必有响应**：配置未完成时拨动开关不再静默失败——直接把用户带到文件夹配置层并说明原因，
+  开关自动弹回，避免「看着是开的、其实没生效」；「立即备份」在未配置 / 未开启时分别给出可操作提示；
+  文件夹行增加按压反馈与「配置文件夹」强调胶囊，整行可点。
+- **配置层可读性与尺寸**：「选择 / 修改」按钮由白字无底改为浅蓝底 + 蓝字 + 描边（浅深色下均 ≥4.5:1）；
+  配置层改为雾玻璃面板，高度随断点自适应（平板 560vp / 手机 500vp），不再固定 520vp。
+- **鸿蒙 7 雾玻璃统一**：`CardContainer`、悬浮底栏、侧栏 / 顶栏、各页对话框、配置层统一使用
+  `BlurStyle.COMPONENT_THICK` + 半透明底（明 `#FFFFFFCC` / 暗 `#191D24CC`）+ 1px 冷灰描边 + 大半径浅投影；
+  弹层遮罩改用 `Theme.scrim()`（明 `#1B243480` / 暗 `#00000099`），不再写死 `#66000000`。
+- **配色重塑**：主色由 `#3D74C4` → 天青蓝 `#2E6AD6`（白底对比度 5.0:1）；新增 `buttonSoftBg / buttonSoftFg /
+  buttonSoftBorder`（浅底按钮三件套）、`pressBg`（按压反馈）、`scrim`、`cardShadow`、`glassBlur()`、
+  `heroGradientColors` 等令牌；页面渐变底改为三段式冷调渐变；首页健康横幅图标底跟随状态语义色，
+  快捷入口图标改用主色系。
+- **校验**：`validate_project.py` PASS（ZH=EN=628，新增 3 条自动备份文案）；release 编译 BUILD SUCCESSFUL（0 error）。
+
+最终包：`dist/QnapNasManager-2.1.5-unsigned.hap`（unsigned），SHA-256
+`0e6aceb53c6687b2d80227925ec8443d2023235e0d88627a250465797400854d`。
+
+**后续版本号**：当前基线为 2.1.5，下一次从 2.1.6 递增，不再回到 1.2.x 序列。
 
 **真机诊断：直接读状态文件（最快，无需日志）**：
 
@@ -588,8 +618,13 @@ python tools/sign_release.py --verify-only  # 只复核现有 profile 与 signed
 
 ## 五、鸿蒙 7 设计：雾玻璃 + 左右滑动 + 大屏范式
 
-- **雾玻璃以框的形式展示**：`CardContainer` / `MetricTile` 支持 `glass: true`，组合 `backgroundBlurStyle(BlurStyle.Regular)` + **高不透明度**底（`#FFFFFFF2` / `#1E222AD9`）+ **可见淡灰描边**（浅色 `#E2E6EB` / 深色 `#2E333B`）+ 极轻投影（`rgba(31,38,51,0.05)` / `rgba(0,0,0,0.22)`）；`Theme.ets` 统一下发 `glassBg / glassBorder / glassShadow` 令牌。设备主页等栏全部以玻璃框呈现。
-  - 底色改为近乎不透明是**刻意为之**：玻璃层会采样窗口背景，若沿用系统默认底色，设备壁纸 / 主题的**暖黄调会透过模糊层给整页染色**，去不掉黄。配合 `EntryAbility` 显式 `setWindowBackgroundColor('#F4F5F6')` 彻底阻断渗透。
+- **雾玻璃是唯一材质语言**：`CardContainer({ glass: true })`、悬浮底栏、侧栏 / 顶栏、各页对话框、自动备份配置层，
+  统一为「`BlurStyle.COMPONENT_THICK` 组分模糊 + 半透明底（明 `#FFFFFFCC` / 暗 `#191D24CC`）+ 1px 冷灰描边
+  （明 `#E3E9F2` / 暗 `#2F3541`）+ 大半径浅投影（`Theme.cardShadow`，明 r16 / 暗 r18）」。
+  玻璃层保持约 0.80 不透明度：既透出页面渐变形成纵深，又挡住系统壁纸 / 设备主题的**暖黄调**染色；
+  配合 `EntryAbility` 显式 `setWindowBackgroundColor('#F1F3F7')` 彻底阻断渗透。
+  - 弹层遮罩统一走 `Theme.scrim()`（明 `#1B243480` / 暗 `#00000099`），不再散落写死 `#66000000`。
+  - 可点击行 / 卡片按下时叠 `Theme.pressBg()`，保证「按下去有反馈」而不是一片沉默。
 - **系统强调色泄漏防护**：HarmonyOS `Button` 默认取系统强调色（可能是暖黄），因此所有 `Button` 一律 `ButtonType.Capsule` + 显式 `backgroundColor / fontColor`（`Theme.buttonPrimaryBg / buttonPrimaryFg / buttonGhostBg / buttonGhostFg / buttonDangerBg`）；`Toggle` 显式 `selectedColor` + `switchPointColor('#FFFFFF')`；`TextInput` 显式 `caretColor`。
 - **页面柔和渐变底**：外壳与页面铺 `linearGradient`（`Theme.pageGradientColors` 返回 `[颜色, 位置]` 元组数组），玻璃框模糊其后方，形成通透大气观感。
 - **所有页面左右滑动**：四个业务页（设备主页 / 文件 / 容器 / 我的）统一放入 `Swiper`；`goTo()` 与侧栏 / 底部导航双向同步，`onChange` 回写当前页；`loop` 关闭、指示器隐藏，滑动与点按等效。
@@ -600,8 +635,13 @@ python tools/sign_release.py --verify-only  # 只复核现有 profile 与 signed
   侧边栏与顶栏同步改为 `chromeBg`（`#FBFBFCD2` / `#171A1FC2`）+ 系统模糊 + 单边描边，全局只有一套雾玻璃语言。
 - **页面自身持有滚动**：`pagedContent()` 的 Swiper 子项**不再包 `Scroll()`**（此前 `Scroll(){ HomePage() }` 让页面 `height('100%')` 失去确定值，直接导致整页空白）；滚动下沉到各页自己的 `Scroll().layoutWeight(1)`，`PageHeader` 固定不动。
 
-- **素雅色板（默认，零暖黄）**：中性灰基底 `#F4F5F6 → #FAFAFB` + 白卡片 `#FFFFFF` + 1px 极淡描边 `#E7E9EC`；强调色为克制钢蓝 `#3D74C4`（仅用于按钮 / 选中 / 链接等小面积），大面积图表用低饱和墨蓝 `#7D93B8`，成功 `#4E8C74` / 注意态冷灰 `#6E7681` / 危险 `#B5615C` 均去饱和处理。深色模式同步一套（`#16181C → #0F1114` 基底 / `#1B1E23` 卡片）。`Theme.ets` 为唯一样式来源，`preview/index.html` 的 CSS 变量与之逐一对应。
-  - 原警告色 `#B08A4E`（暖黄褐）已改为冷灰 `#6E7681`，`color.json` 同步 `warning #F5A623 → #6E7681`、`primary #0A59F7 → #3D74C4`、`success #31B773 → #4E8C74`、`danger #E5544B → #B5615C`。
+- **冷调色板（默认，零暖黄）**：基底 `#F7F9FD → #E9EEF6` 三段式冷调渐变 + 白卡片 `#FFFFFF` + 1px 极淡描边 `#E6EAF1`；
+  强调色为天青蓝 `#2E6AD6`（白底对比度 5.0:1，仅用于按钮 / 选中 / 链接等小面积），大面积图表用低饱和墨蓝 `#7E93B8`，
+  成功 `#2E8B6B` / 注意态冷灰 `#6B7480` / 危险 `#C0524C` 均去饱和处理。深色模式同步一套
+  （`#151920 → #0A0C10` 基底 / `#171A20` 卡片）。`Theme.ets` 为唯一样式来源，`preview/index.html` 的 CSS 变量与之逐一对应。
+  - 浅底按钮三件套 `buttonSoftBg / buttonSoftFg / buttonSoftBorder`：**禁止**再用「白字 + 浅色底」的组合，
+    这类写法对比度接近 1:1，等同隐形（2.1.5 修复的自动备份开关即为此类问题）。
+  - 原警告色 `#B08A4E`（暖黄褐）已改为冷灰 `#6E7681`，`color.json` 同步 `warning #F5A623 → #6B7480`、`primary #0A59F7 → #2E6AD6`、`success #31B773 → #2E8B6B`、`danger #E5544B → #C0524C`。
   - 像素级审计（8 张真机数据截图）实测**暖黄像素占比 0.0000%**、中位饱和度 0.11~0.14。
 - **栅格令牌**：`BreakpointSystem` 统一下发分栏数、间距、圆角、标题字号与最大内容宽度，页面不写魔法数字。
 
@@ -706,10 +746,10 @@ python tools/sign_release.py --verify-only  # 只复核现有 profile 与 signed
 | # | 项目 | 状态 | 说明 |
 | --- | --- | --- | --- |
 | 1 | Stage 模型 / ArkTS 静态类型 / 无 `any` / 无非空断言 | ✅ | 真实编译 + 静态校验 PASS |
-| 2 | `bundleName`、版本号、图标、应用名资源 | ✅ | `com.wlt.qnap.nasmanager` / `2.1.4` / `QTS NAS` / 48 图标 |
+| 2 | `bundleName`、版本号、图标、应用名资源 | ✅ | `com.wlt.qnap.nasmanager` / `2.1.5` / `QTS NAS` / 48 图标 |
 | 3 | 设备类型 `phone / tablet / 2in1`、多断点适配 | ✅ | 宽度驱动 sm / md / lg |
 | 4 | 权限最小化与申请原因 | ✅ | `INTERNET`、`GET_NETWORK_INFO`、`READ_IMAGEVIDEO` 三项 + `$string` 用途说明；未使用的 `KEEP_BACKGROUND_RUNNING` 已删除 |
-| 5 | 中英双语、深浅色 | ✅ | 625×2 文案键 |
+| 5 | 中英双语、深浅色 | ✅ | 628×2 文案键 |
 | 6 | release 构建 + 代码压缩 | ✅ | signed HAP |
 | 7 | `app_gallery` 类型 release profile | ✅ | `verify-profile` PASS |
 | 8 | HAP 签名 + 验签 | 本地自备 | 仓库只分发 unsigned；签名需自有 AGC 证书与 `QNAP_SIGN_PASSWORD` |

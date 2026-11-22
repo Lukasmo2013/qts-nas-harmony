@@ -27,7 +27,7 @@ export default class EntryAbility extends UIAbility {
     // 设备主题色 / 壁纸的暖黄色会透过模糊层给整个界面染上黄调。
     windowStage.getMainWindow()
       .then((mainWindow: window.Window) => {
-        mainWindow.setWindowBackgroundColor('#F4F5F6');
+        mainWindow.setWindowBackgroundColor('#F1F3F7');
       })
       .catch(() => {
         // 取不到主窗口时忽略，交由页面自身的渐变底兜底

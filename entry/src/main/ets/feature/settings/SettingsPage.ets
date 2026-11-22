@@ -62,6 +62,12 @@ export struct SettingsPage {
   @State autoDraftPhoneName: string = '';
   @State autoDraftNasPath: string = '';
   @State autoDraftPersisted: boolean = false;
+  /** 开关显示值：与持久化配置解耦，配置不全时能把开关原地弹回去。 */
+  @State autoOn: boolean = false;
+  /** 文件夹行的按压反馈：点击必须有视觉响应，避免「按了没反应」的错觉。 */
+  @State folderPressed: boolean = false;
+  /** 程序化改写开关时置位，防止 onChange 反向触发切换逻辑形成死循环。 */
+  private autoSwitchGuard: boolean = false;
   /** NAS 目录选择器正在为自动备份服务（true）还是手动备份根目录服务（false）。 */
   @State pickForAuto: boolean = false;
   /* ---- NAS 目录选择器 ---- */
@@ -85,6 +91,8 @@ export struct SettingsPage {
     this.loadStorage();
     this.loadAlbumRoot();
     this.loadOverview();
+    // 开关初始值直接取自持久化配置，避免进页面时显示与实际状态不一致。
+    this.autoOn = this.autoConfig().enabled;
     // 权限可能被用户在系统设置里撤回，进页面时重新探测并回写状态。
     AutoBackupService.restorePermission();
   }
@@ -639,18 +647,33 @@ export struct SettingsPage {
     }
   }
 
-  /** 自动备份状态行：状态标签 + 当前配置摘要 + 开关/立即备份按钮。 */
+  /**
+   * 自动备份控制区：显式开关 + 状态标签 + 配置/立即备份入口。
+   *
+   * 之前这里是「白字 + 浅蓝底」的文字按钮（对比度接近 1:1，等于隐形），
+   * 也没有任何状态控件，用户看不出当前是开还是关。现改为：
+   * 1) 右侧放 46×26 的开关控件，开为主色、关为浅灰轨道，一眼可见；
+   * 2) 开启态整块面板换成浅蓝底 + 蓝边，状态强化；
+   * 3) 未配置文件夹时拨动开关不静默失败，直接落到配置层并给出提示。
+   */
   @Builder
   autoBackupRow() {
     Column() {
       Row() {
         Stack() {
-          Circle().width(34).height(34).fill(Theme.quietIconBg(this.theme))
-          Image($r('app.media.ic_upload')).width(17).height(17).fillColor(Theme.iconTint(this.theme))
+          Circle()
+            .width(36)
+            .height(36)
+            .fill(this.autoOn ? Theme.primarySoft(this.theme) : Theme.quietIconBg(this.theme))
+          Image($r('app.media.ic_upload'))
+            .width(17)
+            .height(17)
+            .fillColor(this.autoOn ? Theme.PRIMARY : Theme.iconTint(this.theme))
         }
-        .width(34)
-        .height(34)
-        .margin({ right: 10 })
+        .width(36)
+        .height(36)
+        .margin({ right: 11 })
+
         Column() {
           Row() {
             Text(t('gallery.auto.title', this.lang))
@@ -659,9 +682,11 @@ export struct SettingsPage {
               .fontColor(Theme.textPrimary(this.theme))
             StatusTag({
               text: this.autoStatusText(),
-              tone: this.autoConfig().enabled && this.autoConfig().lastError.length === 0 ? 'success' : 'info'
+              tone: this.autoOn && this.autoConfig().lastError.length === 0 ? 'success' : 'info'
             }).margin({ left: 6 })
           }
+          .alignItems(VerticalAlign.Center)
+
           Text(this.autoDetailText())
             .fontSize(10)
             .fontColor(Theme.textSecondary(this.theme))
@@ -671,41 +696,60 @@ export struct SettingsPage {
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
+
+        Toggle({ type: ToggleType.Switch, isOn: this.autoOn })
+          .width(46)
+          .height(26)
+          .selectedColor(Theme.PRIMARY)
+          .switchPointColor('#FFFFFF')
+          .accessibilityText(t('gallery.auto.switch', this.lang))
+          .margin({ left: 8 })
+          .onChange((isOn: boolean) => {
+            this.onAutoSwitch(isOn);
+          })
       }
       .width('100%')
       .alignItems(VerticalAlign.Center)
 
       Row() {
-        Text(t(this.autoConfig().enabled ? 'gallery.auto.disable' : 'gallery.auto.enable', this.lang))
+        Button(t('gallery.auto.folder.config', this.lang), { type: ButtonType.Capsule })
+          .height(32)
           .fontSize(12)
-          .fontColor(Theme.buttonPrimaryFg(this.theme))
-          .padding({ left: 14, right: 14, top: 7, bottom: 7 })
-          .backgroundColor(Theme.primarySoft(this.theme))
-          .borderRadius(8)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Theme.buttonSoftFg(this.theme))
+          .backgroundColor(Theme.buttonSoftBg(this.theme))
+          .border({ width: 1, color: Theme.buttonSoftBorder(this.theme) })
+          .layoutWeight(1)
           .onClick(() => {
-            this.toggleAutoBackup();
+            this.openAutoDialog();
           })
-        Text(t('gallery.auto.runNow', this.lang))
+        Button(t('gallery.auto.runNow', this.lang), { type: ButtonType.Capsule })
+          .height(32)
           .fontSize(12)
-          .fontColor(Theme.textSecondary(this.theme))
-          .padding({ left: 14, right: 14, top: 7, bottom: 7 })
-          .backgroundColor(Theme.subCardBg(this.theme))
-          .borderRadius(8)
-          .margin({ left: 8 })
-          .opacity(this.autoBusy || !this.autoConfig().enabled ? 0.45 : 1)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Theme.buttonPrimaryFg(this.theme))
+          .backgroundColor(Theme.buttonPrimaryBg(this.theme))
+          .layoutWeight(1)
+          .margin({ left: 10 })
+          .enabled(!this.autoBusy)
+          .opacity(this.autoBusy ? 0.6 : 1)
           .onClick(() => {
             this.runAutoNow();
           })
       }
       .width('100%')
-      .margin({ top: 9 })
+      .margin({ top: 11 })
     }
     .width('100%')
-    .padding({ top: 4, bottom: 10 })
+    .padding(12)
+    .backgroundColor(this.autoOn ? Theme.primarySoft(this.theme) : Theme.subCardBg(this.theme))
+    .borderRadius(14)
+    .border({ width: 1, color: this.autoOn ? Theme.buttonSoftBorder(this.theme) : Theme.hairline(this.theme) })
+    .margin({ bottom: 10 })
     .alignItems(HorizontalAlign.Start)
   }
 
-  /** 自动备份文件夹入口：显示手机与 NAS 两端配置，点击进入配置层。 */
+  /** 自动备份文件夹入口：显示手机与 NAS 两端配置，点击进入配置层（带按压反馈）。 */
   @Builder
   autoFolderRow() {
     Row() {
@@ -732,14 +776,32 @@ export struct SettingsPage {
       }
       .layoutWeight(1)
       .alignItems(HorizontalAlign.Start)
+      Text(t('gallery.auto.folder.config', this.lang))
+        .fontSize(11)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(Theme.buttonSoftFg(this.theme))
+        .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+        .backgroundColor(Theme.buttonSoftBg(this.theme))
+        .borderRadius(9)
+        .border({ width: 1, color: Theme.buttonSoftBorder(this.theme) })
+        .margin({ right: 4 })
       Image($r('app.media.ic_chevron'))
         .width(16)
         .height(16)
         .fillColor(Theme.textSecondary(this.theme))
     }
     .width('100%')
-    .padding({ top: 10, bottom: 10 })
+    .padding({ left: 8, right: 8, top: 10, bottom: 10 })
+    .borderRadius(12)
+    .backgroundColor(this.folderPressed ? Theme.pressBg(this.theme) : Color.Transparent)
     .alignItems(VerticalAlign.Center)
+    .onTouch((event: TouchEvent) => {
+      if (event.type === TouchType.Down) {
+        this.folderPressed = true;
+      } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+        this.folderPressed = false;
+      }
+    })
     .onClick(() => {
       this.openAutoDialog();
     })
@@ -993,15 +1055,56 @@ export struct SettingsPage {
     return detail;
   }
 
-  /** 开启 / 关闭自动备份；配置不全时明确拦截，不让用户以为已经生效。 */
-  toggleAutoBackup(): void {
-    const wasEnabled: boolean = this.autoConfig().enabled;
-    const errorKey: string = AutoBackupService.setEnabled(!wasEnabled);
-    if (errorKey.length > 0) {
-      this.showToast(errorKey);
+  /** 手机与 NAS 两端是否都已配置。 */
+  private autoConfigured(): boolean {
+    const config: AutoBackupConfig = this.autoConfig();
+    return config.phoneUri.length > 0 && config.nasPath.length > 0;
+  }
+
+  /** 把开关的显示值同步回持久化配置（用于拒绝切换后原地弹回）。 */
+  private syncAutoOn(): void {
+    const enabled: boolean = this.autoConfig().enabled;
+    if (enabled === this.autoOn) {
       return;
     }
-    this.showToast(wasEnabled ? 'gallery.auto.disabled' : 'gallery.auto.enabled');
+    this.autoSwitchGuard = true;
+    this.autoOn = enabled;
+    setTimeout(() => {
+      this.autoSwitchGuard = false;
+    }, 60);
+  }
+
+  /**
+   * 开关回调：配置不完整时不静默失败，直接把用户带到配置层并说明原因，
+   * 同时把开关弹回关闭态，避免出现「看着是开的、其实没生效」。
+   */
+  onAutoSwitch(isOn: boolean): void {
+    if (this.autoSwitchGuard) {
+      return;
+    }
+    if (isOn && !this.autoConfigured()) {
+      this.showToast('gallery.auto.needFolders');
+      this.autoSwitchGuard = true;
+      this.autoOn = false;
+      setTimeout(() => {
+        this.autoSwitchGuard = false;
+      }, 60);
+      this.openAutoDialog();
+      return;
+    }
+    const errorKey: string = AutoBackupService.setEnabled(isOn);
+    if (errorKey.length > 0) {
+      this.showToast(errorKey);
+      this.syncAutoOn();
+      return;
+    }
+    this.autoOn = isOn;
+    this.showToast(isOn ? 'gallery.auto.enabled' : 'gallery.auto.disabled');
+  }
+
+  /** 保留的切换入口：供开关以外的地方调用，内部仍走 onAutoSwitch。 */
+  toggleAutoBackup(): void {
+    this.onAutoSwitch(!this.autoOn);
   }
 
   /** 立即扫描一次：使用与主备份完全相同的 TransferManager 队列。 */
@@ -1009,9 +1112,20 @@ export struct SettingsPage {
     if (this.autoBusy) {
       return;
     }
+    // 未配置先引导配置，未开启先明确提示：不再出现「点了完全没动静」。
+    if (!this.autoConfigured()) {
+      this.showToast('gallery.auto.needFolders');
+      this.openAutoDialog();
+      return;
+    }
+    if (!this.autoOn) {
+      this.showToast('gallery.auto.enableFirst');
+      return;
+    }
     this.autoBusy = true;
     const result = await AutoBackupService.runIfEnabled();
     this.autoBusy = false;
+    this.autoOn = this.autoConfig().enabled;
     if (result.queued > 0 && result.errorKey.length === 0) {
       this.showToastText(tf('gallery.auto.queued', this.lang, String(result.queued)));
       return;
@@ -1023,12 +1137,21 @@ export struct SettingsPage {
 
   /** 打开配置层时先把已保存配置带入草稿，取消则不会写回。 */
   openAutoDialog(): void {
-    const config: AutoBackupConfig = this.autoConfig();
-    this.autoDraftPhoneUri = config.phoneUri;
-    this.autoDraftPhoneName = config.phoneName;
-    this.autoDraftNasPath = config.nasPath;
-    this.autoDraftPersisted = config.persisted;
+    // 先置位再读配置：即使配置读取异常，点击也必须有响应。
     this.autoOpen = true;
+    this.autoDraftPhoneUri = '';
+    this.autoDraftPhoneName = '';
+    this.autoDraftNasPath = '';
+    this.autoDraftPersisted = false;
+    try {
+      const config: AutoBackupConfig = this.autoConfig();
+      this.autoDraftPhoneUri = config.phoneUri;
+      this.autoDraftPhoneName = config.phoneName;
+      this.autoDraftNasPath = config.nasPath;
+      this.autoDraftPersisted = config.persisted;
+    } catch (e) {
+      this.showToast('gallery.auto.folder.empty');
+    }
   }
 
   closeAutoDialog(): void {
@@ -1084,7 +1207,14 @@ export struct SettingsPage {
     AutoBackupService.saveFolders(this.autoDraftPhoneUri, this.autoDraftPhoneName,
       this.autoDraftNasPath, this.autoDraftPersisted);
     this.autoOpen = false;
+    this.autoOn = this.autoConfig().enabled;
     this.showToast('gallery.auto.saved');
+    // 首配完成但开关还关着时，明确告诉用户下一步该做什么。
+    if (!this.autoOn) {
+      setTimeout(() => {
+        this.showToast('gallery.auto.enableFirst');
+      }, 1200);
+    }
   }
 
   /** 从 photoAccessHelper 返回的 uri 里取原始文件名（解码、清理、保留扩展名）。 */
@@ -1119,6 +1249,8 @@ export struct SettingsPage {
     this.pickPath = '';
     this.pickLoading = true;
     try {
+      // 每次打开都重新向设备要共享名单，避免新增共享（如 Data）看不到。
+      NasRepository.resetShareCache();
       this.pickShares = await NasRepository.shares();
       if (this.pickShares.length === 0) {
         this.pickError = t('gallery.pick.noShares', this.lang);
@@ -1561,8 +1693,12 @@ export struct SettingsPage {
             .alignItems(HorizontalAlign.Start)
             Text(t('gallery.auto.phone.choose', this.lang))
               .fontSize(12)
-              .fontColor(Theme.buttonPrimaryFg(this.theme))
-              .padding({ left: 8, right: 2, top: 6, bottom: 6 })
+              .fontWeight(FontWeight.Medium)
+              .fontColor(Theme.buttonSoftFg(this.theme))
+              .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+              .backgroundColor(Theme.buttonSoftBg(this.theme))
+              .borderRadius(9)
+              .border({ width: 1, color: Theme.buttonSoftBorder(this.theme) })
               .opacity(this.autoBusy ? 0.45 : 1)
               .onClick(() => {
                 this.pickAutoPhoneFolder();
@@ -1608,8 +1744,12 @@ export struct SettingsPage {
             .alignItems(HorizontalAlign.Start)
             Text(t('gallery.auto.nas.choose', this.lang))
               .fontSize(12)
-              .fontColor(Theme.buttonPrimaryFg(this.theme))
-              .padding({ left: 8, right: 2, top: 6, bottom: 6 })
+              .fontWeight(FontWeight.Medium)
+              .fontColor(Theme.buttonSoftFg(this.theme))
+              .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+              .backgroundColor(Theme.buttonSoftBg(this.theme))
+              .borderRadius(9)
+              .border({ width: 1, color: Theme.buttonSoftBorder(this.theme) })
               .onClick(() => {
                 this.openAutoNasPicker();
               })
@@ -1664,10 +1804,13 @@ export struct SettingsPage {
       .margin({ top: 12 })
     }
     .width('100%')
-    .height(520)
+    .height(BreakpointSystem.isWide(this.bp) ? 560 : 500)
     .padding(18)
-    .backgroundColor(Theme.cardBg(this.theme))
-    .borderRadius(18)
+    .backgroundColor(Theme.glassBg(this.theme))
+    .backgroundBlurStyle(Theme.glassBlur())
+    .border({ width: 1, color: Theme.glassBorder(this.theme) })
+    .borderRadius(20)
+    .shadow(Theme.cardShadow(this.theme))
     .alignItems(HorizontalAlign.Start)
   }
 
@@ -1798,8 +1941,11 @@ export struct SettingsPage {
     .width('100%')
     .height('72%')
     .padding(18)
-    .backgroundColor(Theme.cardBg(this.theme))
-    .borderRadius(18)
+    .backgroundColor(Theme.glassBg(this.theme))
+    .backgroundBlurStyle(Theme.glassBlur())
+    .border({ width: 1, color: Theme.glassBorder(this.theme) })
+    .borderRadius(20)
+    .shadow(Theme.cardShadow(this.theme))
     .alignItems(HorizontalAlign.Start)
   }
 
@@ -2020,7 +2166,7 @@ export struct SettingsPage {
         }
         .width('100%')
         .height('100%')
-        .backgroundColor('#66000000')
+        .backgroundColor(Theme.scrim(this.theme))
         .justifyContent(FlexAlign.Center)
         .alignItems(HorizontalAlign.Center)
         .padding({ left: 24, right: 24 })
@@ -2032,7 +2178,7 @@ export struct SettingsPage {
         }
         .width('100%')
         .height('100%')
-        .backgroundColor('#66000000')
+        .backgroundColor(Theme.scrim(this.theme))
         .justifyContent(FlexAlign.Center)
         .alignItems(HorizontalAlign.Center)
         .padding({ left: 24, right: 24 })
@@ -2044,7 +2190,7 @@ export struct SettingsPage {
         }
         .width('100%')
         .height('100%')
-        .backgroundColor('#66000000')
+        .backgroundColor(Theme.scrim(this.theme))
         .justifyContent(FlexAlign.End)
         .padding({ left: 12, right: 12, bottom: 12 })
       }

@@ -187,8 +187,17 @@ export struct FilesPage {
     }
   }
 
-  /** 下拉刷新：强制从 NAS 重新读取当前目录，不复用上次列表。 */
+  /** 下拉刷新：清缓存后重新向设备要共享名单，再读当前目录（支持新增共享立即出现）。 */
   async doRefresh(): Promise<void> {
+    NasRepository.resetShareCache();
+    try {
+      const fresh: string[] = await NasRepository.shares();
+      if (fresh.length > 0) {
+        this.shares = fresh;
+      }
+    } catch (e) {
+      // 刷新失败保留旧名单，仍继续刷当前目录。
+    }
     await this.load();
     this.refreshing = false;
   }
@@ -1083,7 +1092,7 @@ export struct FilesPage {
     .padding(14)
     .backgroundColor(Theme.glassBg(this.theme))
     .border({ width: 1, color: Theme.glassBorder(this.theme) })
-    .backgroundBlurStyle(BlurStyle.Regular)
+    .backgroundBlurStyle(Theme.glassBlur())
     .borderRadius(14)
     .onClick(() => {
       if (this.selectMode) {
@@ -1361,8 +1370,11 @@ export struct FilesPage {
     }
     .width('100%')
     .padding(20)
-    .backgroundColor(Theme.cardBg(this.theme))
-    .borderRadius(18)
+    .backgroundColor(Theme.glassBg(this.theme))
+    .backgroundBlurStyle(Theme.glassBlur())
+    .border({ width: 1, color: Theme.glassBorder(this.theme) })
+    .borderRadius(20)
+    .shadow(Theme.cardShadow(this.theme))
     .alignItems(HorizontalAlign.Start)
   }
 

@@ -1632,29 +1632,71 @@ export class QnapApi {
     }
     const url = QnapApi.baseUrl() + '/cgi-bin/priv/privRequest.cgi?subfunc=share&read=2&refresh=0';
     const candidates: string[] = [];
+    /** 设备在「共享清单」里明确列出的项：探测失败也保留，否则 Data 这类共享会被误过滤。 */
+    const explicit: string[] = [];
     const body = await QnapApi.get(url);
     if (body.length === 0) {
       return [];
     }
+
+    const push = (list: string[], raw: string): void => {
+      const name: string = raw.trim().replace(/^\/+/, '');
+      if (name.length > 0 && list.indexOf(name) < 0) {
+        list.push(name);
+      }
+    };
+
+    // 1) 默认共享清单（可能包含尚未创建的目录，如 TMBackup）
+    //    不同固件的分隔符可能是 / 或 ;，统一归一化后再拆，避免把「A;B」当成一个共享名。
     const defList = cdata(body, 'defShareList');
     if (defList.length > 0) {
-      const parts = defList.split('/');
+      const normalized: string = defList.replace(/;/g, '/').replace(/\|/g, '/');
+      const parts = normalized.split('/');
       for (const part of parts) {
-        const name = part.trim();
-        if (name.length > 0 && candidates.indexOf(name) < 0) {
-          candidates.push(name);
-        }
+        push(candidates, part);
       }
     }
-    const blocks = cdataBlocks(body, 'no_del_info');
-    for (const block of blocks) {
+
+    // 2) 系统共享（Public / Container 等）
+    const sysBlocks = cdataBlocks(body, 'no_del_info');
+    for (const block of sysBlocks) {
       const name = cdata(block, 'share_name');
-      if (name.length > 0 && candidates.indexOf(name) < 0) {
-        candidates.push(name);
+      push(candidates, name);
+      push(explicit, name);
+    }
+
+    // 3) 普通共享：share_list / share_info（旧实现漏解析，导致只显示前两个系统共享）
+    const listTags: string[] = ['share_info', 'share'];
+    for (const tag of listTags) {
+      const blocks = cdataBlocks(body, tag);
+      for (const block of blocks) {
+        let name = cdata(block, 'share_name');
+        if (name.length === 0) {
+          name = cdata(block, 'shareName');
+        }
+        push(candidates, name);
+        push(explicit, name);
       }
     }
+
+    // 4) 部分固件直接平铺 <share_name> / <shareName>
+    const flatTags: string[] = ['share_name', 'shareName'];
+    for (const tag of flatTags) {
+      const blocks = cdataBlocks(body, tag);
+      for (const block of blocks) {
+        const name = cdata(block, tag);
+        push(candidates, name);
+        push(explicit, name);
+      }
+    }
+
     const valid: string[] = [];
     for (const name of candidates) {
+      // 清单里明确存在的共享直接采用，避免逐个 get_list 探测既慢又误杀只读共享。
+      if (explicit.indexOf(name) >= 0) {
+        valid.push('/' + name);
+        continue;
+      }
       const probe = await QnapApi.files('/' + name, 1);
       if (probe.valid) {
         valid.push('/' + name);
