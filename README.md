@@ -13,6 +13,34 @@
 
 ---
 
+## 📱 界面预览
+
+> 截图由工程的 HTML 预览页渲染，演示数据统一使用文档保留值：设备名 `NAS-DEMO`、地址 `192.0.2.10`、账号 `demo-user`、密码栏留空。**画面中不含任何真实设备、真实局域网地址或个人账号信息。**
+
+**平板 · 浅色主题**
+
+| 设备主页 | 文件管理 |
+| :---: | :---: |
+| <img src="docs/screenshots/02-home-tablet.png" width="430" alt="设备主页" /> | <img src="docs/screenshots/03-files-tablet.png" width="430" alt="文件管理" /> |
+
+| 容器管理 | 我的 |
+| :---: | :---: |
+| <img src="docs/screenshots/04-docker-tablet.png" width="430" alt="容器管理" /> | <img src="docs/screenshots/05-profile-tablet.png" width="430" alt="我的" /> |
+
+**手机端**
+
+| 设备主页 | 文件管理 | 登录 |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/06-home-phone.png" width="215" alt="手机设备主页" /> | <img src="docs/screenshots/07-files-phone.png" width="215" alt="手机文件" /> | <img src="docs/screenshots/09-login-phone.png" width="215" alt="手机登录" /> |
+
+**深色模式与登录页**
+
+| 深色 · 设备主页（含设备电源） | 平板 · 登录 |
+| :---: | :---: |
+| <img src="docs/screenshots/08-home-dark.png" width="430" alt="深色模式设备主页" /> | <img src="docs/screenshots/01-login-tablet.png" width="430" alt="登录页" /> |
+
+---
+
 ## ✨ 项目特色
 
 ### 1. Tailscale 原生集成（核心特色）
