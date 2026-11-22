@@ -675,7 +675,9 @@ python tools/sign_release.py --verify-only  # 只复核现有 profile 与 signed
 
 ### 3. 设备主页 `feature/home/`
 
-`async load()` 拉取真实概览（`sysmonitor`：CPU / 内存 / 温度 / 网络吞吐 / uptime）与近期事件（`syslog`）：健康横幅、四指标玻璃框栅格、存储容量、**三个快捷入口**（文件 / 容器 / 设置）、近期事件、设备信息。布局为「`PageHeader` 固定 + 内容区 `Scroll().layoutWeight(1)`」，平板为大屏三段式。
+`async load()` 拉取真实概览（`sysmonitor`：CPU / 内存 / 温度 / 网络吞吐 / uptime）与近期事件（`syslog`）：健康横幅、四指标玻璃框栅格、存储容量、**三个快捷入口**（文件 / 容器 / 设置）、**设备电源**（重启 / 关机，二次确认）、近期事件、设备信息。布局为「`PageHeader` 固定 + 内容区 `Scroll().layoutWeight(1)`」，平板为大屏三段式。
+
+电源操作走 `POST /cgi-bin/sys/sysRequest.cgi?subfunc=power_mgmt&apply=<restart|shutdown>`（`restart` 被拒时回退 `reboot`）：成功回包只有 `authPassed=1`；指令被接受后设备立即进入关机流程，CGI 常来不及回包，因此「有 HTTP 响应但包体为空」判为已下发；连接层失败无法区分「没送到」与「已关机被踢下线」，统一归为未确认，只有明确被拒才提示失败。
 
 ### 4. 核心功能模块
 

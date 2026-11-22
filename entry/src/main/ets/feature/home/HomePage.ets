@@ -3,7 +3,7 @@ import { Theme } from '../../common/constants/Theme';
 import { t } from '../../common/i18n/I18n';
 import { BreakpointSystem } from '../../common/utils/BreakpointSystem';
 import { FormatUtil } from '../../common/utils/FormatUtil';
-import { DeviceOverview, DeviceSession, EventItem } from '../../model/Models';
+import { DeviceOverview, DeviceSession, EventItem, OpResult } from '../../model/Models';
 import { NasRepository } from '../../service/NasRepository';
 import { SessionManager } from '../../service/SessionManager';
 import { CardContainer, InfoRow, MetricTile, PageHeader, ProgressBar, SectionTitle, StatusTag, ToastBar } from '../../components/CommonCards';
@@ -45,6 +45,12 @@ export struct HomePage {
   @State toastVisible: boolean = false;
   /** 下拉刷新状态：由 Refresh 组件驱动，结束后必须归位。 */
   @State refreshing: boolean = false;
+  /** 电源确认层：空串表示关闭，'reboot' / 'shutdown' 表示待确认的动作。 */
+  @State powerKind: string = '';
+  /** 指令下发中：禁用确认按钮，避免重复提交。 */
+  @State powerBusy: boolean = false;
+  /** 正在按下的电源行，仅用于按压反馈。 */
+  @State powerPressed: string = '';
   onNavigate: (tab: number) => void = () => {
   };
 
@@ -75,6 +81,78 @@ export struct HomePage {
     setTimeout(() => {
       this.toastVisible = false;
     }, 2200);
+  }
+
+  /* ---------- 系统电源 ---------- */
+
+  /** 电源操作不可撤销，一律先弹确认层，不做「点一下就执行」。 */
+  askPower(kind: string): void {
+    if (this.powerBusy) {
+      return;
+    }
+    this.powerPressed = '';
+    this.powerKind = kind;
+  }
+
+  /**
+   * 下发电源指令。三种结果分开提示：
+   * 成功 / 设备有响应但未回确认（status = -2）/ 明确失败。
+   * 不允许把「未确认」说成成功，也不允许把「已下发」说成失败。
+   */
+  async doPower(): Promise<void> {
+    const kind: string = this.powerKind;
+    if (this.powerBusy || kind.length === 0) {
+      return;
+    }
+    this.powerBusy = true;
+    let result: OpResult = { ok: false, status: -1 };
+    try {
+      result = await NasRepository.powerAction(kind);
+    } catch (e) {
+      result = { ok: false, status: -1 };
+    }
+    this.powerBusy = false;
+    this.powerKind = '';
+    if (result.ok) {
+      this.showToast(kind === 'shutdown' ? 'home.power.shutdown.sent' : 'home.power.reboot.sent');
+    } else if (result.status === -2) {
+      this.showToast('home.power.uncertain');
+    } else {
+      this.showToast('home.power.failed');
+    }
+  }
+
+  powerIsShutdown(): boolean {
+    return this.powerKind === 'shutdown';
+  }
+
+  /** 电源图标底：关机用极淡红，重启用极淡蓝，都不铺大面积高饱和色。 */
+  powerIconBg(): string {
+    return this.powerIsShutdown() ? Theme.tagBackground('danger', this.theme)
+      : Theme.primarySoft(this.theme);
+  }
+
+  powerIcon(): Resource {
+    return this.powerIsShutdown() ? $r('app.media.ic_power') : $r('app.media.ic_reboot');
+  }
+
+  powerIconFg(): string {
+    return this.powerIsShutdown() ? Theme.DANGER : Theme.PRIMARY;
+  }
+
+  powerConfirmTitle(): string {
+    return t(this.powerIsShutdown() ? 'home.power.shutdown.confirm' : 'home.power.reboot.confirm', this.lang);
+  }
+
+  powerConfirmLabel(): string {
+    if (this.powerBusy) {
+      return t('home.power.sending', this.lang);
+    }
+    return t(this.powerIsShutdown() ? 'home.power.shutdown' : 'home.power.reboot', this.lang);
+  }
+
+  powerConfirmBg(): string {
+    return this.powerIsShutdown() ? Theme.buttonDangerBg(this.theme) : Theme.buttonPrimaryBg(this.theme);
   }
 
   healthTone(): string {
@@ -300,9 +378,152 @@ export struct HomePage {
     return list;
   }
 
+  /** 单条电源操作：图标 + 标题 + 说明 + 箭头，整行可点，按下有极淡底色反馈。 */
   @Builder
-  eventsCard() {
+  powerRow(kind: string, icon: Resource, titleKey: string, descKey: string) {
+    Row() {
+      Stack() {
+        Circle()
+          .width(36)
+          .height(36)
+          .fill(kind === 'shutdown' ? Theme.tagBackground('danger', this.theme)
+            : Theme.primarySoft(this.theme))
+        Image(icon)
+          .width(18)
+          .height(18)
+          .fillColor(kind === 'shutdown' ? Theme.DANGER : Theme.PRIMARY)
+      }
+      .width(36)
+      .height(36)
+
+      Column() {
+        Text(t(titleKey, this.lang))
+          .fontSize(14)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Theme.textPrimary(this.theme))
+        Text(t(descKey, this.lang))
+          .fontSize(11)
+          .fontColor(Theme.textSecondary(this.theme))
+          .margin({ top: 3 })
+          .maxLines(2)
+      }
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
+      .margin({ left: 11 })
+
+      Image($r('app.media.ic_chevron'))
+        .width(13)
+        .height(13)
+        .fillColor(Theme.textSecondary(this.theme))
+    }
+    .width('100%')
+    .padding({ left: 8, right: 6, top: 10, bottom: 10 })
+    .alignItems(VerticalAlign.Center)
+    .borderRadius(12)
+    .backgroundColor(this.powerPressed === kind ? Theme.pressBg(this.theme) : Color.Transparent)
+    .onTouch((event: TouchEvent) => {
+      if (event.type === TouchType.Down) {
+        this.powerPressed = kind;
+      } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+        this.powerPressed = '';
+      }
+    })
+    .onClick(() => {
+      this.askPower(kind);
+    })
+  }
+
+  @Builder
+  powerCard() {
     CardContainer({ glass: true }) {
+      SectionTitle({ text: t('home.power.title', this.lang) })
+      Column() {
+        this.powerRow('reboot', $r('app.media.ic_reboot'), 'home.power.reboot', 'home.power.reboot.desc')
+        Divider()
+          .strokeWidth(1)
+          .color(Theme.hairline(this.theme))
+          .margin({ left: 47 })
+        this.powerRow('shutdown', $r('app.media.ic_power'), 'home.power.shutdown', 'home.power.shutdown.desc')
+      }
+      .width('100%')
+      .margin({ top: 2 })
+    }
+  }
+
+  /** 二次确认层：与全 app 其它弹层同一套 surface 规格（圆角 / 描边 / 投影）。 */
+  @Builder
+  powerConfirmLayer() {
+    Column() {
+      Stack() {
+        Circle()
+          .width(48)
+          .height(48)
+          .fill(this.powerIconBg())
+        Image(this.powerIcon())
+          .width(22)
+          .height(22)
+          .fillColor(this.powerIconFg())
+      }
+      .width(48)
+      .height(48)
+
+      Text(this.powerConfirmTitle())
+        .fontSize(16)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Theme.textPrimary(this.theme))
+        .margin({ top: 14 })
+        .textAlign(TextAlign.Center)
+
+      Text(t('home.power.confirm.desc', this.lang))
+        .fontSize(12)
+        .fontColor(Theme.textSecondary(this.theme))
+        .margin({ top: 7 })
+        .textAlign(TextAlign.Center)
+        .maxLines(3)
+
+      Row() {
+        // 取消始终可点：请求挂住时（开机箱已开始关机，回包要等到超时）不能把用户锁在弹层里。
+        // 关闭弹层不撤销已发出的请求，结果仍会以提示告知。
+        Button(t('action.cancel', this.lang))
+          .layoutWeight(1)
+          .height(40)
+          .fontSize(13)
+          .fontColor(Theme.buttonGhostFg(this.theme))
+          .backgroundColor(Theme.buttonGhostBg(this.theme))
+          .borderRadius(10)
+          .onClick(() => {
+            this.powerKind = '';
+          })
+
+        Button(this.powerConfirmLabel())
+          .layoutWeight(1)
+          .height(40)
+          .fontSize(13)
+          .fontColor(Theme.buttonPrimaryFg(this.theme))
+          .backgroundColor(this.powerConfirmBg())
+          .borderRadius(10)
+          .enabled(!this.powerBusy)
+          .margin({ left: 10 })
+          .onClick(() => {
+            this.doPower();
+          })
+      }
+      .width('100%')
+      .margin({ top: 18 })
+      .alignItems(VerticalAlign.Center)
+    }
+    .width('86%')
+    .constraintSize({ maxWidth: 380 })
+    .padding({ left: 22, right: 22, top: 22, bottom: 18 })
+    .backgroundColor(Theme.cardBg(this.theme))
+    .borderRadius(20)
+    .border({ width: 1, color: Theme.surfaceBorder(this.theme) })
+    .shadow(Theme.surfaceShadow(this.theme))
+    .alignItems(HorizontalAlign.Center)
+  }
+
+  @Builder
+  eventsCard() {    CardContainer({ glass: true }) {
       SectionTitle({ text: t('home.recent.events', this.lang), trailing: this.events.length > 0 ? t('home.viewAll', this.lang) : '' })
       if (this.events.length === 0) {
         Column() {
@@ -390,6 +611,7 @@ export struct HomePage {
             this.storageCard()
             SectionTitle({ text: t('home.quick.actions', this.lang) })
             this.quickActions()
+            this.powerCard()
           }
           .layoutWeight(3)
           .alignItems(HorizontalAlign.Start)
@@ -416,6 +638,7 @@ export struct HomePage {
         this.storageCard()
         SectionTitle({ text: t('home.quick.actions', this.lang) })
         this.quickActions()
+        this.powerCard()
         this.eventsCard()
         this.deviceCard()
       }
@@ -425,57 +648,77 @@ export struct HomePage {
   }
 
   build() {
-    Column() {
-      PageHeader({
-        title: t('home.title', this.lang),
-        subtitle: t('home.subtitle', this.lang),
-        showAction: true,
-        actionLabel: t('action.refresh', this.lang),
-        onAction: () => {
-          this.load();
-          this.showToast('home.last.updated');
-        }
-      })
-
-      ToastBar({ text: this.toastText, visible: this.toastVisible })
-
-      // 下拉刷新 + 页面自滚动：Refresh 提供手势，Scroll 承载内容。
-      Refresh({ refreshing: $$this.refreshing, offset: 80, friction: 42 }) {
-        Scroll() {
-          Column() {
-            if (this.state === LoadState.SUCCESS) {
-              this.successContent()
-            } else if (this.state === LoadState.LOADING && !this.refreshing) {
-              StateView({ state: LoadState.LOADING })
-            } else {
-              StateView({
-                state: this.state,
-                onRetry: () => {
-                  this.load();
-                },
-                onGoSettings: () => {
-                  this.onNavigate(PageTab.PROFILE);
-                }
-              })
-            }
+    Stack() {
+      Column() {
+        PageHeader({
+          title: t('home.title', this.lang),
+          subtitle: t('home.subtitle', this.lang),
+          showAction: true,
+          actionLabel: t('action.refresh', this.lang),
+          onAction: () => {
+            this.load();
+            this.showToast('home.last.updated');
           }
+        })
+
+        ToastBar({ text: this.toastText, visible: this.toastVisible })
+
+        // 下拉刷新 + 页面自滚动：Refresh 提供手势，Scroll 承载内容。
+        Refresh({ refreshing: $$this.refreshing, offset: 80, friction: 42 }) {
+          Scroll() {
+            Column() {
+              if (this.state === LoadState.SUCCESS) {
+                this.successContent()
+              } else if (this.state === LoadState.LOADING && !this.refreshing) {
+                StateView({ state: LoadState.LOADING })
+              } else {
+                StateView({
+                  state: this.state,
+                  onRetry: () => {
+                    this.load();
+                  },
+                  onGoSettings: () => {
+                    this.onNavigate(PageTab.PROFILE);
+                  }
+                })
+              }
+            }
+            .width('100%')
+            .padding({ bottom: 20 })
+            .alignItems(HorizontalAlign.Start)
+          }
+          .layoutWeight(1)
           .width('100%')
-          .padding({ bottom: 20 })
-          .alignItems(HorizontalAlign.Start)
+          .scrollBar(BarState.Off)
         }
         .layoutWeight(1)
         .width('100%')
-        .scrollBar(BarState.Off)
+        .onRefreshing(() => {
+          this.doRefresh();
+        })
       }
-      .layoutWeight(1)
       .width('100%')
-      .onRefreshing(() => {
-        this.doRefresh();
-      })
+      .height('100%')
+      .padding({ left: BreakpointSystem.pagePadding(this.bp), right: BreakpointSystem.pagePadding(this.bp) })
+      .alignItems(HorizontalAlign.Start)
+
+      // 电源确认层：盖住整页（含顶栏），点空白处不关闭，避免误触。
+      if (this.powerKind.length > 0) {
+        Column() {
+          this.powerConfirmLayer()
+        }
+        .width('100%')
+        .height('100%')
+        .backgroundColor(Theme.scrim(this.theme))
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+        // 吞掉空白处的点击，避免穿透到下层卡片（尤其是顶栏的「刷新」）。
+        .onClick(() => {
+        })
+      }
     }
     .width('100%')
     .height('100%')
-    .padding({ left: BreakpointSystem.pagePadding(this.bp), right: BreakpointSystem.pagePadding(this.bp) })
-    .alignItems(HorizontalAlign.Start)
+    .alignContent(Alignment.Center)
   }
 }

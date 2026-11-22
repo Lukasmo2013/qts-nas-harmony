@@ -259,6 +259,19 @@ export class NasRepository {
     return await QnapApi.containerLogs(containerId);
   }
 
+  /* ---- 系统电源 ---- */
+
+  /**
+   * 重启 / 关机。kind 取 'reboot' | 'shutdown'。
+   * 返回 status = -2 表示「设备有响应但无法确认结果」，界面按未确认处理。
+   */
+  static async powerAction(kind: string): Promise<OpResult> {
+    if (DemoMode.isActive()) {
+      return DemoMode.ok();
+    }
+    return await QnapApi.powerAction(kind);
+  }
+
   /* ---- 文案辅助 ---- */
 
   static eventTitle(id: string, lang: string): string {

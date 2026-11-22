@@ -1631,6 +1631,87 @@ export class QnapApi {
     return overview;
   }
 
+  /* ==================== 系统电源 ==================== */
+
+  /**
+   * 重启 / 关机（QTS 电源管理）。
+   *
+   * 接口：`POST /cgi-bin/sys/sysRequest.cgi?subfunc=power_mgmt&apply=<action>`，
+   * 成功时返回一段只含 `authPassed=1` 的 XML，没有 status 字段。
+   *
+   * 两个必须小心的点：
+   *   1. 指令一旦被接受，设备立刻进入关机流程，CGI 往往来不及回包——
+   *      「有 HTTP 响应但包体为空」应当判为**已下发**，而不是失败；
+   *   2. 连接层失败（status=0）无法区分「没送到」与「已关机被踢下线」，
+   *      同样归为**未确认**，不谎报失败。
+   *
+   * 因此返回只有三种语义：`ok=true`（已下发）/ `status=-2`（未确认）/ 其它（明确被拒）。
+   *
+   * @param kind 'reboot' 或 'shutdown'
+   */
+  static async powerAction(kind: string): Promise<OpResult> {
+    // QTS 电源页的动作名与参数同名：Shut down → shutdown，Restart → restart。
+    // 少数固件只认 reboot，故保留为次选；restart 收到有效回包后就不再尝试。
+    const applies: string[] = kind === 'shutdown' ? ['shutdown'] : ['restart', 'reboot'];
+    let last: OpResult = { ok: false, status: -1 };
+    for (let i = 0; i < applies.length; i++) {
+      const result: OpResult = await QnapApi.powerOnce(applies[i]);
+      // 已下发、明确成功、或「有响应但无法解析」都不再尝试下一个参数。
+      if (result.ok || result.status === -2) {
+        return result;
+      }
+      last = result;
+    }
+    return last;
+  }
+
+  /** 单个电源参数的提交与判定，见 powerAction 的注释。 */
+  private static async powerOnce(apply: string): Promise<OpResult> {
+    const build = (): string => {
+      let url = QnapApi.baseUrl() + '/cgi-bin/sys/sysRequest.cgi?subfunc=power_mgmt&apply=' + apply;
+      if (QnapApi.sid.length > 0) {
+        url += '&sid=' + QnapApi.sid;
+      }
+      return url;
+    };
+    let raw = await QnapApi.sendRaw(build(), http.RequestMethod.POST, '', 12000,
+      'application/x-www-form-urlencoded; charset=UTF-8');
+    if (QnapApi.isAuthFailure(raw.body)) {
+      const renewed: boolean = await QnapApi.relogin();
+      if (renewed) {
+        raw = await QnapApi.sendRaw(build(), http.RequestMethod.POST, '', 12000,
+          'application/x-www-form-urlencoded; charset=UTF-8');
+      }
+    }
+    // 连接层失败：既可能是「指令没送到」，也可能是「设备已开始关机、把连接重置了」。
+    // http 模块区分不了这两种情况，一律归为「未确认」(-2)。
+    // 宁可提示「已发出但未确认」，也不能把一次成功的重启说成失败——那样用户会反复重试。
+    if (raw.status === 0) {
+      const unknown: OpResult = { ok: false, status: -2 };
+      return unknown;
+    }
+    // 有 HTTP 响应但包体为空：设备已在关机流程里，视为已下发。
+    if (raw.body.length === 0) {
+      const accepted: OpResult = { ok: true, status: 1 };
+      return accepted;
+    }
+    // 标准成功回包：只有 authPassed=1。
+    if (cdata(raw.body, 'authPassed') === '1') {
+      const accepted: OpResult = { ok: true, status: 1 };
+      return accepted;
+    }
+    // 少数固件走 JSON 回包。
+    try {
+      const obj = JSON.parse(raw.body) as OpResp;
+      const status: number = obj.status !== undefined ? obj.status : -2;
+      const parsed: OpResult = { ok: status === 1, status: status };
+      return parsed;
+    } catch (e) {
+      const unparsed: OpResult = { ok: false, status: -2 };
+      return unparsed;
+    }
+  }
+
   /* ==================== 文件 ==================== */
 
   /**
