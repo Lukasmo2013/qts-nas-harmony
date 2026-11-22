@@ -374,11 +374,11 @@ peers: myiddrive → 100.x.x.x ; myidnas → 100.x.x.x ; …
 - **边界**：预览模式下所有写操作返回占位成功但不发任何请求；自动备份不启动；容器端口不打开外部网页。
   主界面顶部常驻「预览模式」提示条并提供「退出预览」，退出登录会同时清除预览标记。
 - **隔离**：预览会话使用文档保留地址与示例账号，不含任何真实凭据；跨重启保留，退出即销毁。
-- **验证**：validate_project PASS（ZH=EN=625）；sim_ts_flow 全过；release 编译 BUILD SUCCESSFUL（0 error）；
-  sign_release verify-app digest=true。
+- **验证**：validate_project PASS（ZH=EN=625）；sim_ts_flow 全过；release 编译 BUILD SUCCESSFUL（0 error）。
+- **分发约定**：本仓库只提供 **unsigned HAP**；签名证书、keystore、口令与 signed 产物一律不入库。
 
-最终包：`dist/QnapNasManager-2.1.4-signed.hap`，SHA-256
-`c954e0480693fd10bf5982da17a4af62ebfc3d29267d3fad00c51ef11e4228e1`。
+最终包：`dist/QnapNasManager-2.1.4-unsigned.hap`（unsigned），SHA-256
+`ee6c182ad2852f76774a66fc4bb5c6bee79bdb25d288d030746b572d61f689f8`。
 
 **后续版本号**：当前基线为 2.1.4，下一次从 2.1.5 递增，不再回到 1.2.x 序列。
 
@@ -696,7 +696,7 @@ python tools/sign_release.py --verify-only  # 只复核现有 profile 与 signed
 | 5 | 中英双语、深浅色 | ✅ | 625×2 文案键 |
 | 6 | release 构建 + 代码压缩 | ✅ | signed HAP |
 | 7 | `app_gallery` 类型 release profile | ✅ | `verify-profile` PASS |
-| 8 | HAP 签名 + 验签 | ✅ | `verify-app` PASS（本地自签链） |
+| 8 | HAP 签名 + 验签 | 本地自备 | 仓库只分发 unsigned；签名需自有 AGC 证书与 `QNAP_SIGN_PASSWORD` |
 | 9 | **AGC 官方证书 / provision profile** | ❌ | 当前为**本地自签**，设备不信任；上架必须替换 |
 | 10 | **真机安装运行** | ❌ | `hdc install` 报 `code:9568257 fail to verify pkcs7 file` |
 | 11 | 隐私政策 / 权限说明页 | ✅ | 登录页协议文字可点击；「我的 → 关于」提供完整中英文本，离线可读 |
