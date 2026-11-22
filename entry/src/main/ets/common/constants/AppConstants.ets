@@ -71,9 +71,13 @@ export class AppConstants {
   static readonly COPYRIGHT: string = '© 2026 莫洁安';
   static readonly LICENSE_NAME: string = 'MIT License';
 
-  /** 默认连接配置：首次使用时由用户输入，不预置任何账号与设备 */
+  /**
+   * 默认连接配置：首次使用时由用户自行输入。
+   * 这里**不预置**任何设备地址、账号或口令（含 base64 形式），避免随包分发任何凭据；
+   * 记住登录信息只发生在用户主动勾选后，且口令不落盘。
+   */
   static readonly DEFAULT_HOST: string = '';
   static readonly DEFAULT_PORT: number = 5000;
   static readonly DEFAULT_USER: string = '';
-  static readonly DEFAULT_PASS: string = '';
+  static readonly DEFAULT_PASSWORD: string = '';
 }

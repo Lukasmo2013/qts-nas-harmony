@@ -37,3 +37,6 @@ __pycache__/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# 本机私有调试产物（含真机地址 / 凭据的探针脚本，绝不入库）
+/.local/

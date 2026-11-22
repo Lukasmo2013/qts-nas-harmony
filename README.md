@@ -4,7 +4,6 @@
 
 **作者 / 版权**：莫洁安（annst） · **许可**：MIT · **当前版本**：2.1.7
 
-**仓库地址**：https://gitee.com/YOUR_GITEE_ACCOUNT/qts-nas-harmony
 **更新日志**：[CHANGELOG.md](./CHANGELOG.md)（2.1.5 起独立维护，含修复根因说明）
 
 > 应用显示名统一为 **QTS NAS**（系统级应用名走 `app_name` 资源，应用内标题走 `app.name` 文案键）。
@@ -123,8 +122,7 @@ QNAP、QTS、Container Station、Tailscale 等名称与标识归各自权利人�
 | HarmonyOS 原生工程 | `AppScope/`、`entry/`、`hvigor/`、`*.json5` | DevEco Studio 6.0.0.878 实测可编译的完整源码工程 |
 | **unsigned release HAP** | `entry/build/default/outputs/default/entry-default-unsigned.hap` | 本仓库唯一分发的构建产物；签名请在本地用自有证书完成 |
 | 签名链路（可选） | `tools/sign_release.py` | 读取 `QNAP_SIGN_PASSWORD` 环境变量在本地签名，证书与口令不入库 |
-| 高保真交互预览 | `preview/index.html` | 单文件、零依赖；复刻雾玻璃 + 左右滑动新 UI，可经 `tools/qnap_proxy.py` 接真实设备数据 |
-| 真实数据代理 | `tools/qnap_proxy.py` | 开发期浏览器预览用的 QTS 桥接（CORS），设备端不经过它 |
+| 高保真交互预览 | `preview/index.html` | 单文件、零依赖；复刻雾玻璃 + 左右滑动新 UI，可直接双击打开 |
 | 签名与校验工具链 | `tools/` | 图标生成、静态校验、冒烟测试、证书链 / profile / HAP 签名与验签 |
 
 **本机工具链实测**：DevEco Studio `6.0.0.878`、HarmonyOS SDK `6.0.0.47 / API 20`、hvigor `6.20.2`、hap-sign-tool、hdc `3.2.0b`。debug 与 release 两种 buildMode 均已在本机真实编译通过，release 已完成签名与验签。
@@ -513,7 +511,7 @@ ACL 仅放行移动端 tag 访问 NAS 的 5000/5001；不要启用 Funnel 把 QT
 
 - ArkTS 端 `QnapApi.get()` 对空结果退避 400ms 后重试一次（`delay()` 辅助）；
 - 各页面数据**串行**加载，不并发打设备；
-- 开发期代理 `tools/qnap_proxy.py` 用 `QnapClient._lock` 串行排队 + 退避重试；
+- 开发期真机探针使用串行排队 + 退避重试，避免和设备抢会话；
 - 预览页 `loadData()` 也改为串行拉取，数据就绪后统一重绘。
 
 ### ArkTS 严格类型实现要点（编译实测）
@@ -560,21 +558,22 @@ QnapNasHarmony/
 │               ├── docker/DockerPage.ets     容器（真实 Container Station）
 │               └── settings/SettingsPage.ets 个人中心与设置（含存储卷 / 硬盘 / 服务）
 ├── preview/index.html                交互预览（雾玻璃 + 左右滑动）
-└── tools/
-    ├── qnap_proxy.py                 ★ 真实数据本地代理（预览页 CORS 桥接）
+└── tools/                           仅保留不含凭据的构建 / 校验脚本
     ├── gen_assets.py                 生成图标资源
     ├── validate_project.py           工程静态一致性校验（含 JSON5 注释）
     ├── validate_preview.py           预览 JS 语法与文案校验
     ├── smoke_preview.js              交互路径无头测试
-    ├── shoot_preview.py              ★ Playwright 无头登录真实 NAS 并批量截图
-    ├── audit_palette.py              ★ Pillow 像素级配色审计（暖黄占比 / 饱和度）
-    ├── install_device.py             一键连接 / 安装 / 拉起真机
+    ├── sim_ts_flow.py                Tailscale 登录状态机仿真
+    ├── bump_version.py               版本号与 versionCode 同步
+    ├── release.sh                    一键校验 + release 编译
+    ├── push_gitee.sh                 交互式推送（口令由 git 自身提示，不落盘）
     ├── prepare_signing_config.js     生成 hvigor 可解密的加密口令 + material/
-    ├── sign_release.py               完整 release 证书链 / profile / HAP 签名与验签
-    └── signing/                      证书、keystore、profile、验签结果与产物
+    └── sign_release.py               证书链 / profile / HAP 签名与验签（口令读环境变量）
 ```
 
-> `tools/probe_fs*.py`、`tools/probe_ops.py`、`tools/probe_fs_ops.py` 为打通 File Station 6 读写契约时的一次性真机探测脚本，保留以备复查接口，不再参与构建。Container Station 5 的 v3 契约（`/container-station/api/v3/*` + `Authorization: Bearer <sid>`，401=会话失效 / 404=未安装 / 200=`data.items`）已在本轮经真实设备验证并固化进 `QnapApi.ets`，其一次性探测脚本已清理。
+> 真机探针、截图与配色审计脚本需要设备地址与账号口令，属于**本机私有工具**，统一放在 `.local/tools/`（已 gitignore），不随仓库分发。
+
+> 打通 File Station 6 读写契约时使用的一次性真机探测脚本**已全部清理出仓库**（它们内嵌本机设备地址与账号口令），契约结论已完整固化到本节与 `QnapApi.ets`。Container Station 5 的 v3 契约（`/container-station/api/v3/*` + `Authorization: Bearer <sid>`，401=会话失效 / 404=未安装 / 200=`data.items`）已在本轮经真实设备验证并固化进 `QnapApi.ets`，其一次性探测脚本已清理。
 
 ---
 
@@ -610,7 +609,7 @@ python tools/sign_release.py --verify-only  # 只复核现有 profile 与 signed
 
 ### 交互预览（无需 SDK）
 
-1. （可选，接真实数据）启动代理：`python tools/qnap_proxy.py`（默认 `127.0.0.1:7890`，桥接 `192.0.2.10:5000`）。代理的 `/api/overview`、`/api/storage`、`/api/services`、`/api/containers` 返回结构与 ArkTS 端 `DeviceOverview` / `StorageBundle` / `ServiceInfo` / `ContainerListResult` **完全一致**，预览所见即真机所见。
+1. （可选，接真实数据）本机自备一个 QTS 桥接代理即可；接口结构需与 ArkTS 端 `DeviceOverview` / `StorageBundle` / `ServiceInfo` / `ContainerListResult` 一致，预览即所见即真机所见。代理脚本含设备地址与凭据，**属于本机私有工具，不随仓库分发**。
 2. 浏览器打开 `preview/index.html`：顶部工具条可切换 **手机 / 平板**、**中文 / English**、**浅色 / 深色**；登录卡顶部的两枚胶囊可在 **本地 IP / QNAP ID** 间切换（ID 模式走 `<name>.myqnapcloud.com` + 8081/443 探测）；进入后**左右滑动**在四个页面（设备主页 / 文件 / 容器 / 我的）间切换，所有卡片为雾玻璃框，手机底栏是**悬浮圆角雾玻璃长条**。
 3. 文件页的**新建 / 重命名 / 删除**会真的打到设备（`POST /api/mkdir|rename|delete`，与真机同一套 FS6 form-urlencoded 契约），删除为移入 `@Recycle`；容器页在未装 Container Station 的设备上显示「未安装」引导页而非空列表。代理未启动时可点「离线预览界面」查看 UI（真实空态，无假数据）。
 
@@ -723,7 +722,7 @@ python tools/sign_release.py --verify-only  # 只复核现有 profile 与 signed
 | **文件写操作实测（代理）** | `mkdir → rename → delete`（临时目录 `__wlt_probe_ui__`） | 三步全部 `{"ok":true,"status":1}`；重命名后旧名消失、新名出现；删除后列表无残留 |
 | **容器未安装态判定** | `GET /api/containers` | `{"items":[],"installed":false,"error":"HTTP Error 404"}` → 应用渲染「未安装 Container Station」页 |
 | 预览页一致性 | `python tools/validate_preview.py` | **PASS**：ZH=EN=140 键，JS 语法与 handler 引用全部解析 |
-| 视觉去黄像素审计 | `python tools/audit_palette.py` | **13 张截图暖黄像素占比全部 0.0000%**，中位饱和度 0.07~0.40 |
+| 视觉去黄像素审计 | （本机截图脚本，不入库） | **13 张截图暖黄像素占比全部 0.0000%**，中位饱和度 0.07~0.40 |
 | 无线调试真机连接 | `hdc tconn 192.0.2.10:35475` | 曾 **Connect OK**；HUAWEI Mate 60 Pro，HarmonyOS 7.0.0.111，API 26（当前会话已断开，需重新 tconn） |
 
 ### 本机调试中修复的问题（真实编译暴露）
@@ -779,8 +778,7 @@ python tools/sign_release.py --verify-only  # 只复核现有 profile 与 signed
 5. 一键安装（自动连接 / 安装 / 拉起）：
 
    ```bash
-   python tools/install_device.py                 # 默认 192.0.2.10:35475
-   python tools/install_device.py --list          # 先看设备是否在线
+   hdc list targets                               # 先确认设备在线
    ```
 
    脚本等价于 `hdc tconn <target>` → `hdc install -r entry-default-signed.hap` →
@@ -853,5 +851,5 @@ python tools/sign_release.py --verify-only  # 只复核现有 profile 与 signed
 2. 使用 AGC 正式证书与 profile 签名，替换 `tools/signing/` 下的本地自签测试材料。
 3. 提供真实设备截图（手机 + 平板、浅色 + 深色），按 11.5 规范脱敏。
 4. 在商店后台填写开发者联系方式，替换隐私政策第十节的占位描述。
-5. `tools/` 下的诊断脚本默认地址为文档保留地址，密码从环境变量 `NAS_PASSWORD` 读取；仅供本地排查，不随应用包分发。
+5. 真机探测/诊断脚本（含设备地址与账号口令）**不进仓库**：本机放在 `.local/`（已 gitignore），需要时自行维护；仓库内只保留不带凭据的构建与校验脚本。
 6. 若使用预览账号截图，建议在商店审核备注中说明：示例数据模式从登录页入口进入，退出登录即可返回真实连接。

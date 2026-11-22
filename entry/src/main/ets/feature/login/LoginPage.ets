@@ -144,7 +144,7 @@ export struct LoginPage {
 
   /* ---- 共用凭据 ---- */
   @State username: string = AppConstants.DEFAULT_USER;
-  @State password: string = AppConstants.DEFAULT_PASS;
+  @State password: string = AppConstants.DEFAULT_PASSWORD;
   /* ---- 状态 ---- */
   @State loading: boolean = false;
   /** 自动选路结果提示（当前使用的接入点），让用户知道为什么填好了地址。 */
