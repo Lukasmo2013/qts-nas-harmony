@@ -66,7 +66,7 @@ check('login page renders for zh/en x phone/tablet', renders === 4);
 
 // 2. QNAP ID form validation blocks empty submit
 S.lang = 'zh'; S.device = 'phone';
-S.form.mode = 'qid'; S.form.account = ''; S.form.password = 'wrong-password';
+S.form.mode = 'qid'; S.form.account = ''; S.form.password = '';
 api.act('login-submit', '');
 check('empty QNAP ID shows account error', S.form.accountErr === 'login.err.account');
 check('empty QNAP ID shows password error', S.form.passwordErr === 'login.err.password');
