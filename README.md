@@ -79,6 +79,20 @@ hvigorw assembleHap --mode module -p product=default -p buildMode=release --no-d
 
 ---
 
+## 🌐 发布到 Gitee
+
+```bash
+# 1) 先在 Gitee 新建同名公开仓库（不要勾选“初始化 README”）
+# 2) 推送（脚本不会读取或保存密码）
+bash tools/push_gitee.sh qts-nas-harmony
+#    按提示输入 Gitee 用户名；密码 / 私人令牌由 git 自行提示
+```
+
+Release 附件只上传 **unsigned HAP**：`dist/QnapNasManager-2.1.4-unsigned.hap`。
+**不要上传** `tools/signing/` 下的证书、keystore、profile 或任何 signed 产物。
+
+---
+
 ## 🔐 安全与凭据
 
 - 仓库内**没有**任何 NAS 账号、密码、Tailscale 凭据、签名证书、keystore、profile 或 token；
