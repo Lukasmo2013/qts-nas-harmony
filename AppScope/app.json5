@@ -2,8 +2,8 @@
   "app": {
     "bundleName": "com.wlt.qnap.nasmanager",
     "vendor": "annst",
-    "versionCode": 2001008,
-    "versionName": "2.1.8",
+    "versionCode": 2001009,
+    "versionName": "2.1.9",
     "icon": "$media:app_icon",
     "label": "$string:app_name",
     "minAPIVersion": 12,

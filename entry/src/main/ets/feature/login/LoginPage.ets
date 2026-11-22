@@ -640,6 +640,12 @@ export struct LoginPage {
     this.tsRawStatus = st.detail.length > 200 ? st.detail.substring(0, 200) : st.detail;
     this.tsLastBeat = st.updatedAt;
 
+    // 授权链接必须**先**取，且与心跳无关。
+    // 状态文件即便已经过期，里面的一次性授权链接依然有效，而它是唯一能授权本机的地址；
+    // 扩展被系统回收时我们会不停重启它，若把取链接放在心跳判定之后，
+    // 就永远取不到链接，网页只能停在通用登录页——用户在官网登录成功，本机却始终未授权。
+    this.tsApplyAuthUrl(st.authUrl);
+
     // 存活检测：扩展正常时每秒写一次状态（running 后 2 秒一次）。
     // 超过 8 秒没心跳 = 扩展已被系统回收，状态文件里只是旧快照；
     // 若继续相信它，就会出现"网页提示 Login successful、页头还写着 NeedsLogin"
@@ -650,7 +656,8 @@ export struct LoginPage {
     if (age > 8000) {
       this.tsAuthed = false;
       this.tsEngineErr = t('login.ts.engineDead', this.lang);
-      this.tsStage = 'login.ts.auth.wait';
+      // 扩展已死时不能再写「正在等待授权完成、登录后会自动识别」——那是等不到的空承诺。
+      this.tsStage = this.tsAuthUrlReal ? 'login.ts.auth.wait' : 'login.ts.auth.dead';
       // 自动重连（15 秒最多一次，避免和系统抢占）
       if (Date.now() - this.tsRestartAt > 15000) {
         this.tsRestartAt = Date.now();
@@ -674,8 +681,6 @@ export struct LoginPage {
     if (st.state === 'running') {
       this.tsAuthed = true;
       this.tsAuthBlock = '';
-      // 真实授权 URL 晚到时切过去（官网兜底页 -> 带 key 的授权页）。
-      this.tsApplyAuthUrl(st.authUrl);
       if (this.tsPhase === 'pick') {
         return;
       }
@@ -685,7 +690,6 @@ export struct LoginPage {
       return;
     }
     if (st.state === 'needs_login') {
-      this.tsApplyAuthUrl(st.authUrl);
       this.tsAuthed = false;
       this.tsStage = 'login.ts.auth';
       return;
@@ -815,7 +819,8 @@ export struct LoginPage {
     // 此时用户其实已在网页里完成授权，旧逻辑却永远点不动「下一步」。
     // 现在一律前进到选地址；未连上时该页顶部会明确提示改填局域网 IP。
     this.tsAuthBlock = '';
-    this.tsAuthUrl = '';
+    // 不要清空 tsAuthUrl：从「选地址」退回时 Web 会按它重建，
+    // 清空就会退回通用登录页，再次登录也不会授权本机。
     this.tsStage = '';
     this.tsPickedIp = this.tsCandidates.length === 1 ? this.tsCandidates[0].address : '';
     this.tsIpErr = '';
@@ -824,11 +829,29 @@ export struct LoginPage {
   }
 
   /**
+   * 主按钮文案随实际能力变化。
+   * VPN 扩展已被系统回收（心跳停止）时，「登录后自动识别」不可能成立，
+   * 按钮必须直说「跳过 VPN 直接填地址」，否则用户会以为卡死了。
+   */
+  private tsNextLabel(): string {
+    if (!this.tsAuthed && !this.tsAlive()) {
+      return t('login.ts.nextIp.dead', this.lang);
+    }
+    return t('login.ts.nextIp', this.lang);
+  }
+
+  private tsAuthTip(): string {
+    if (!this.tsAuthed && !this.tsAlive()) {
+      return t('login.ts.auth.tip.dead', this.lang);
+    }
+    return t('login.ts.auth.tip', this.lang);
+  }
+
+  /**
    * 授权完成后的自动前进：延时 900ms 让「已连接」状态先闪一下，
    * 避免用户在完全没看到反馈的情况下被瞬间切页。
    */
-  private tsAutoNext(): void {
-    if (this.tsAutoNextPending) {
+  private tsAutoNext(): void {    if (this.tsAutoNextPending) {
       return;
     }
     this.tsAutoNextPending = true;
@@ -1791,7 +1814,7 @@ export struct LoginPage {
 
       Column() {
         if (!this.tsAuthed) {
-          Text(t('login.ts.auth.tip', this.lang))
+          Text(this.tsAuthTip())
             .fontSize(11)
             .fontColor(Theme.textSecondary(this.theme))
             .width('100%')
@@ -1814,7 +1837,7 @@ export struct LoginPage {
           .alignItems(VerticalAlign.Center)
           .margin({ bottom: 8 })
         }
-        Button(t('login.ts.nextIp', this.lang), { type: ButtonType.Capsule })
+        Button(this.tsNextLabel(), { type: ButtonType.Capsule })
           .width('100%')
           .height(44)
           .fontSize(15)

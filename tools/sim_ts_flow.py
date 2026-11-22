@@ -69,6 +69,11 @@ class Page:
         # 进入「选地址」后继续轮询：VPN 稍后连上时候选会自动补进列表
         if self.tsPhase not in (AUTH, PICK):
             return
+        # 授权链接先取，且与心跳无关：过期状态文件里的一次性链接仍然有效，
+        # 而它是唯一能真正授权本机的地址。放在存活检测之后就永远取不到。
+        if st.get('authUrl') and st['authUrl'] != self.tsAuthUrl:
+            self.tsAuthUrl = st['authUrl']
+            self.tsAuthUrlReal = True
         # 存活检测：状态文件超过 8 秒没心跳 = 扩展已被回收，内容只是旧快照
         age = st.get('age', 0)
         if age > 8000:
@@ -90,9 +95,6 @@ class Page:
         self.tsEngineErr = ''
         if state == 'running':
             self.tsAuthed = True
-            if st.get('authUrl') and not self.tsAuthUrlReal:
-                self.tsAuthUrl = st['authUrl']
-                self.tsAuthUrlReal = True
             if self.tsPhase == PICK:
                 return
             self.tsStage = 'login.ts.auth.ok'
@@ -113,7 +115,8 @@ class Page:
         # 2.1.6 起：主按钮无条件放行。引擎心跳可能因系统回收而假死，
         # 但用户往往已在网页里完成授权，旧逻辑会把「下一步」永久卡死。
         self.tsAuthBlock = ''
-        self.tsAuthUrl = ''
+        # 不清空 tsAuthUrl：从「选地址」退回时 Web 会按它重建，
+        # 清空就会退回通用登录页，再次登录也不会授权本机。
         self.tsStage = ''
         self.tsPickedIp = self.tsCandidates[0]['address'] if len(self.tsCandidates) == 1 else ''
         self.tsPhase = PICK
@@ -169,6 +172,10 @@ def run():
         ('G 扩展已死（心跳 12 秒前，真机 VPN 图标消失）',
          {'state': 'needs_login', 'age': 12000},
          'auth', TS_LOGIN_URL, False, DEAD_MSG),
+        ('H 扩展已死但仍留有授权链接（必须继续用真链接）',
+         {'state': 'needs_login', 'age': 12000,
+          'authUrl': 'https://login.tailscale.com/a/dead-but-valid'},
+         'auth', 'https://login.tailscale.com/a/dead-but-valid', False, DEAD_MSG),
     ]
 
     print('=' * 78)

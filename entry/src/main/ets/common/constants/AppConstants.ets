@@ -62,8 +62,8 @@ export class AppConstants {
    * 由 `tools/bump_version.py` 统一维护（改一处会同步改两处），不要手改其中一边。
    * 编码规则：major * 1000000 + minor * 1000 + patch（1.2.1 -> 1002001）。
    */
-  static readonly VERSION_NAME: string = '2.1.8';
-  static readonly VERSION_CODE: string = '2001008';
+  static readonly VERSION_NAME: string = '2.1.9';
+  static readonly VERSION_CODE: string = '2001009';
   /** 构建日期，同样由 bump 脚本写入。 */
   static readonly BUILD_DATE: string = '2026-11-22';
   static readonly BUILD_TAG: string = 'HarmonyOS API 12';
